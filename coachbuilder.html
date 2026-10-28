@@ -1,0 +1,2284 @@
+<title>Coachbuilder</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Design your own car in 3D: shape it by hand, sculpt it, bolt on parts, paint it, drive it and export it for 3D printing.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@112..125,500..800&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: studio viewport beside a spec-sheet panel (stacks under the viewport on phones). */
+:root {
+  --bg: #e9ecea;          /* clay-studio wall, faint green-grey */
+  --panel: #f7f8f6;
+  --ink: #161a1b;
+  --ink-2: #4c5557;
+  --line: #cfd5d2;
+  --accent: #0b6e8a;      /* petrol blue */
+  --accent-ink: #ffffff;
+  --tape: #b5651d;        /* dimension-tape amber */
+  --stage-top: #f4f5f3;
+  --stage-bottom: #cfd4d1;
+  --danger: #a3261b;
+  --ok: #2d7a46;
+  --font-display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111416; --panel: #181c1f; --ink: #e7ebea; --ink-2: #9aa5a6; --line: #2b3236;
+    --accent: #4fc3d9; --accent-ink: #062027; --tape: #e3a15c;
+    --stage-top: #2a3034; --stage-bottom: #0e1113; --danger: #ef7c6f; --ok: #6cc58a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111416; --panel: #181c1f; --ink: #e7ebea; --ink-2: #9aa5a6; --line: #2b3236;
+  --accent: #4fc3d9; --accent-ink: #062027; --tape: #e3a15c;
+  --stage-top: #2a3034; --stage-bottom: #0e1113; --danger: #ef7c6f; --ok: #6cc58a;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 14px; line-height: 1.45; }
+* { box-sizing: border-box; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.app { height: 100%; display: grid; grid-template-rows: auto 1fr; }
+header.top {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding-block: 10px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  border-bottom: 1px solid var(--line); background: var(--panel);
+}
+.brand { font-family: var(--font-display); font-stretch: 125%; font-weight: 800; font-size: 19px; letter-spacing: 0.01em; text-transform: uppercase; display: flex; align-items: baseline; gap: 8px; }
+.brand small { font-family: var(--font-data); font-weight: 400; font-size: 11px; color: var(--ink-2); text-transform: none; letter-spacing: 0; }
+nav.tabs { display: flex; gap: 2px; margin-left: auto; flex-wrap: wrap; }
+nav.tabs button {
+  border: 0; background: none; padding: 7px 12px; border-radius: var(--r); cursor: pointer;
+  font-family: var(--font-display); font-stretch: 112%; font-weight: 600; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-2);
+}
+nav.tabs button[aria-selected="true"] { background: var(--ink); color: var(--panel); }
+nav.tabs button:hover:not([aria-selected="true"]) { color: var(--ink); }
+
+main.work { display: grid; grid-template-columns: minmax(320px, 380px) 1fr; min-height: 0; }
+aside.panel { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; min-height: 0; }
+.panel-inner { padding-block: 16px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: 16px; display: grid; gap: 18px; }
+.stage { position: relative; min-height: 0; min-width: 0; background: linear-gradient(180deg, var(--stage-top), var(--stage-bottom)); overflow: hidden; }
+.stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+@media (max-width: 820px) {
+  .app { height: auto; min-height: 100%; }
+  main.work { grid-template-columns: 1fr; grid-template-rows: 56vh auto; }
+  .stage { order: -1; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 2; }
+  aside.panel { border-right: 0; border-top: 1px solid var(--line); overflow: visible; }
+  .panel-inner { padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  nav.tabs { margin-left: 0; width: 100%; }
+  nav.tabs button { flex: 1; padding: 7px 2px; font-size: 11.5px; letter-spacing: 0.02em; }
+}
+
+h2.sec { margin: 0; font-family: var(--font-display); font-stretch: 118%; font-weight: 700; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-2); }
+.sheet { display: grid; gap: 10px; }
+details.group { border-top: 1px solid var(--line); padding-top: 10px; }
+details.group > summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-family: var(--font-display); font-stretch: 118%; font-weight: 700; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-2); }
+details.group > summary::-webkit-details-marker { display: none; }
+details.group > summary::after { content: "+"; font-family: var(--font-data); font-size: 14px; }
+details.group[open] > summary::after { content: "–"; }
+.rows { display: grid; gap: 12px; padding-top: 12px; }
+.row { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; }
+.row label { font-size: 13px; font-weight: 500; }
+.row output, .val { font-family: var(--font-data); font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.row input[type="range"] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); margin: 2px 0 0; }
+.seg { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px; }
+.seg button { flex: 1 1 auto; border: 1px solid var(--line); background: transparent; border-radius: var(--r); padding: 6px 8px; font-size: 12px; cursor: pointer; }
+.seg button[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--panel); }
+.seg.tools button { padding: 9px 6px; font-weight: 600; font-size: 12.5px; }
+.check { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.check input { accent-color: var(--accent); width: 16px; height: 16px; }
+.checks { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--line); background: var(--bg); border-radius: 999px; padding: 6px 12px; font-size: 12.5px; cursor: pointer; font-weight: 500; }
+.chip:hover { border-color: var(--ink-2); }
+.chip.clay { border-style: dashed; }
+
+.btn { border: 1px solid var(--ink); background: var(--ink); color: var(--panel); border-radius: var(--r); padding: 9px 14px; font-weight: 600; cursor: pointer; font-size: 13.5px; }
+.btn.accent { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+.btn.small { padding: 6px 10px; font-size: 12.5px; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.field { display: grid; gap: 6px; }
+.field label { font-size: 13px; font-weight: 500; }
+input[type="text"], textarea, select { width: 100%; border: 1px solid var(--line); background: var(--bg); border-radius: var(--r); padding: 8px 10px; }
+textarea { resize: vertical; min-height: 64px; }
+.note { font-size: 12.5px; color: var(--ink-2); margin: 0; }
+.status { font-size: 12.5px; margin: 0; min-height: 1.2em; }
+.status.err { color: var(--danger); }
+.status.ok { color: var(--ok); }
+
+.ai { border: 1px solid var(--line); border-radius: var(--r); padding: 12px; display: grid; gap: 8px; background: var(--bg); }
+.ai h3 { margin: 0; font-size: 13.5px; font-weight: 600; }
+
+.swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+.swatch { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--panel); box-shadow: 0 0 0 1px var(--line); cursor: pointer; padding: 0; }
+.swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--ink); }
+.color-row { display: flex; align-items: center; gap: 10px; }
+.color-row input[type="color"] { width: 44px; height: 30px; border: 1px solid var(--line); border-radius: var(--r); background: none; padding: 2px; }
+
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.stats div { background: var(--panel); padding: 8px 10px; display: grid; gap: 2px; }
+.stats span { font-size: 11px; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.06em; }
+.stats b { font-family: var(--font-data); font-weight: 500; font-size: 15px; font-variant-numeric: tabular-nums; }
+
+/* parts bin */
+.bin { display: grid; grid-template-columns: repeat(auto-fill, minmax(98px, 1fr)); gap: 6px; }
+.tile { border: 1px solid var(--line); background: var(--bg); border-radius: var(--r); padding: 8px 6px; font-size: 12px; font-weight: 500; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; display: grid; gap: 4px; justify-items: center; text-align: center; }
+.tile:hover { border-color: var(--ink-2); }
+.tile svg { width: 34px; height: 22px; stroke: var(--ink); fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.drag-ghost { position: fixed; z-index: 50; pointer-events: none; padding: 6px 10px; border-radius: var(--r); background: var(--ink); color: var(--panel); font-size: 12px; font-weight: 600; transform: translate(-50%, -140%); }
+.editor { border: 1px solid var(--line); border-radius: var(--r); padding: 12px; display: grid; gap: 10px; background: var(--bg); }
+.editor h3 { margin: 0; font-size: 13.5px; font-weight: 600; display: flex; justify-content: space-between; gap: 8px; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; }
+
+/* spec strip: a tape-drawing dimension line under the car */
+.spec {
+  position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-wrap: wrap; gap: 4px 18px; justify-content: center;
+  padding: 8px max(16px, env(safe-area-inset-right, 0px)) 10px max(16px, env(safe-area-inset-left, 0px));
+  font-family: var(--font-data); font-size: 11.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; pointer-events: none;
+}
+.spec b { color: var(--tape); font-weight: 500; }
+.stage-tools { position: absolute; top: 10px; right: max(10px, env(safe-area-inset-right, 0px)); display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; max-width: 62%; }
+.stage-tools .grp { display: flex; gap: 2px; }
+.icon-btn { border: 1px solid var(--line); background: var(--panel); border-radius: var(--r); padding: 6px 9px; font-size: 12px; cursor: pointer; }
+.icon-btn[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--panel); }
+.icon-btn:disabled { opacity: 0.4; cursor: default; }
+.badge-name { position: absolute; top: 12px; left: max(14px, env(safe-area-inset-left, 0px)); font-family: var(--font-display); font-stretch: 125%; font-weight: 800; font-size: clamp(18px, 3vw, 30px); letter-spacing: 0.02em; text-transform: uppercase; color: var(--ink); opacity: 0.85; pointer-events: none; max-width: 36%; text-wrap: balance; line-height: 1.05; overflow-wrap: anywhere; }
+@media (max-width: 820px) { .hint { display: none; } }
+.hint { position: absolute; left: max(14px, env(safe-area-inset-left, 0px)); bottom: 38px; max-width: min(420px, 80%); background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 6px 10px; font-size: 12px; color: var(--ink-2); pointer-events: none; }
+
+/* drive HUD */
+.hud { position: absolute; inset: 0; pointer-events: none; }
+.hud .speedo { position: absolute; left: max(16px, env(safe-area-inset-left, 0px)); bottom: 16px; font-family: var(--font-display); font-stretch: 125%; font-weight: 800; font-size: 46px; line-height: 1; color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,0.45); }
+.hud .speedo small { font-family: var(--font-data); font-size: 13px; font-weight: 400; margin-left: 6px; }
+.hud .laps { position: absolute; top: 12px; left: max(16px, env(safe-area-inset-left, 0px)); font-family: var(--font-data); font-size: 13px; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.6); display: grid; gap: 2px; font-variant-numeric: tabular-nums; }
+.hud .exit { position: absolute; top: 10px; right: max(10px, env(safe-area-inset-right, 0px)); pointer-events: auto; }
+.touch { position: absolute; bottom: 16px; right: max(16px, env(safe-area-inset-right, 0px)); display: grid; grid-template-columns: repeat(2, 58px); gap: 8px; pointer-events: auto; }
+.touch.left { right: auto; left: max(16px, env(safe-area-inset-left, 0px)); bottom: 84px; }
+.touch button { height: 58px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.5); background: rgba(10,14,16,0.45); color: #fff; font-size: 18px; font-weight: 700; touch-action: none; user-select: none; -webkit-user-select: none; }
+@media (hover: hover) and (pointer: fine) { .touch { display: none; } }
+
+/* gallery */
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.card { border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; background: var(--bg); display: grid; min-width: 0; }
+.card .thumb { aspect-ratio: 16 / 10; width: 100%; max-width: 100%; height: auto; background: linear-gradient(180deg, var(--stage-top), var(--stage-bottom)); display: block; object-fit: cover; }
+.card .meta { padding: 8px; display: grid; gap: 2px; min-width: 0; }
+.card .meta b { font-size: 13px; overflow-wrap: anywhere; }
+.card .meta span { font-size: 11.5px; color: var(--ink-2); overflow-wrap: anywhere; }
+.card .acts { display: flex; gap: 4px; padding: 0 8px 8px; flex-wrap: wrap; }
+.card .acts button { border: 1px solid var(--line); background: var(--panel); border-radius: var(--r); padding: 4px 8px; font-size: 12px; cursor: pointer; }
+.card .acts button[aria-pressed="true"] { color: var(--danger); border-color: var(--danger); }
+.empty { border: 1px dashed var(--line); border-radius: var(--r); padding: 18px; text-align: center; color: var(--ink-2); font-size: 13px; }
+
+.loading { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--font-data); font-size: 12px; color: var(--ink-2); padding: 16px; text-align: center; }
+.code { font-family: var(--font-data); font-size: 11.5px; word-break: break-all; }
+kbd { font-family: var(--font-data); font-size: 11px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand">Coachbuilder <small id="envNote">v2</small></div>
+    <nav class="tabs" role="tablist" aria-label="Sections">
+      <button role="tab" id="tab-shape" aria-selected="true" data-tab="shape">Shape</button>
+      <button role="tab" id="tab-build" aria-selected="false" data-tab="build">Build</button>
+      <button role="tab" id="tab-paint" aria-selected="false" data-tab="paint">Paint</button>
+      <button role="tab" id="tab-drive" aria-selected="false" data-tab="drive">Drive</button>
+      <button role="tab" id="tab-gallery" aria-selected="false" data-tab="gallery">Gallery</button>
+      <button role="tab" id="tab-save" aria-selected="false" data-tab="save">Save</button>
+    </nav>
+  </header>
+  <main class="work">
+    <aside class="panel">
+      <div class="panel-inner">
+        <!-- SHAPE: rough out with presets, AI and sliders -->
+        <section data-pane="shape" class="sheet">
+          <div class="field">
+            <label for="carName">Design name</label>
+            <input type="text" id="carName" maxlength="40" value="Untitled coupe">
+          </div>
+          <div class="sheet">
+            <h2 class="sec">Start from</h2>
+            <div class="chips" id="presets"></div>
+            <p class="note">A starting point replaces the whole car, hand edits included. Undo brings it back.</p>
+          </div>
+          <div class="ai" id="aiBox" hidden>
+            <h3>Describe a car</h3>
+            <textarea id="aiPrompt" maxlength="400" placeholder="A low, angular 70s wedge supercar in Rosso red with a big rear wing"></textarea>
+            <div class="btn-row">
+              <button class="btn accent" id="aiGo">Design it</button>
+              <button class="btn ghost" id="aiStop" hidden>Stop</button>
+            </div>
+            <p class="status" id="aiStatus" aria-live="polite"></p>
+          </div>
+          <p class="note">Sliders rough out the proportions. Shape it by hand in <b>Build</b>: your hand edits stay put when you move a slider.</p>
+          <div id="sliders"></div>
+          <div class="sheet">
+            <h2 class="sec">Estimated performance</h2>
+            <div class="stats" id="stats"></div>
+            <p class="note">Rough estimates from the body shape. Drag coefficient is a guess, not a wind-tunnel number.</p>
+          </div>
+        </section>
+
+        <!-- BUILD: hands-on tools -->
+        <section data-pane="build" class="sheet" hidden>
+          <div class="sheet">
+            <h2 class="sec">Tool</h2>
+            <div class="seg tools" id="toolSeg"></div>
+            <p class="note" id="toolHelp"></p>
+          </div>
+
+          <div class="sheet" data-toolpane="handles">
+            <div class="checks">
+              <label class="check"><input type="checkbox" id="hTop" checked> Roofline</label>
+              <label class="check"><input type="checkbox" id="hWidth" checked> Width</label>
+              <label class="check"><input type="checkbox" id="hBottom" checked> Underside</label>
+            </div>
+            <div class="btn-row">
+              <button class="btn ghost small" id="hDelete" disabled>Delete point</button>
+              <button class="btn ghost small" id="hReset">Reset handles</button>
+            </div>
+          </div>
+
+          <div class="sheet" data-toolpane="sculpt" hidden>
+            <div class="row"><label>Brush</label><div class="seg" id="sculptMode"></div></div>
+            <div class="row"><label for="sSize">Brush size</label><output id="sSizeOut"></output><input type="range" id="sSize" min="0.06" max="0.7" step="0.01" value="0.22"></div>
+            <div class="row"><label for="sStrength">Strength</label><output id="sStrengthOut"></output><input type="range" id="sStrength" min="0.05" max="1" step="0.01" value="0.45"></div>
+            <label class="check"><input type="checkbox" id="sMirror" checked> Mirror left and right</label>
+            <div class="btn-row"><button class="btn ghost small" id="sClear">Clear sculpting</button></div>
+          </div>
+
+          <div class="sheet" data-toolpane="paint" hidden>
+            <div class="row"><label>Paint with</label><div class="seg" id="skinMat"></div></div>
+            <div class="row"><label for="pSize">Brush size</label><output id="pSizeOut"></output><input type="range" id="pSize" min="0.02" max="0.45" step="0.005" value="0.08"></div>
+            <label class="check"><input type="checkbox" id="pMirror" checked> Mirror left and right</label>
+            <label class="check"><input type="checkbox" id="pAuto"> Bare body (turn off automatic windows and lights)</label>
+            <div class="btn-row"><button class="btn ghost small" id="pClear">Clear brush paint</button></div>
+          </div>
+
+          <div class="sheet" data-toolpane="parts" hidden>
+            <p class="note">Drag a part onto the car, or tap it to add it in a sensible spot.</p>
+            <div class="bin" id="bin"></div>
+            <div class="editor" id="partEditor" hidden>
+              <h3><span id="peName">Part</span><span class="val" id="peCount"></span></h3>
+              <div class="grid2">
+                <div class="row"><label for="peLift">Lift</label><output id="peLiftOut"></output><input type="range" id="peLift" min="-0.3" max="0.9" step="0.005"></div>
+                <div class="row"><label for="peSize">Size</label><output id="peSizeOut"></output><input type="range" id="peSize" min="0.1" max="4" step="0.01"></div>
+                <div class="row"><label for="peSx">Length</label><output id="peSxOut"></output><input type="range" id="peSx" min="0.1" max="6" step="0.01"></div>
+                <div class="row"><label for="peSy">Height</label><output id="peSyOut"></output><input type="range" id="peSy" min="0.1" max="6" step="0.01"></div>
+                <div class="row"><label for="peSz">Width</label><output id="peSzOut"></output><input type="range" id="peSz" min="0.1" max="6" step="0.01"></div>
+                <div class="row"><label for="peYaw">Turn</label><output id="peYawOut"></output><input type="range" id="peYaw" min="-180" max="180" step="1"></div>
+                <div class="row"><label for="peTilt">Tilt</label><output id="peTiltOut"></output><input type="range" id="peTilt" min="-90" max="90" step="1"></div>
+                <div class="row"><label for="peRoll">Roll</label><output id="peRollOut"></output><input type="range" id="peRoll" min="-90" max="90" step="1"></div>
+              </div>
+              <div class="checks">
+                <label class="check"><input type="checkbox" id="peAlign"> Follow the surface</label>
+                <label class="check"><input type="checkbox" id="peMirror"> Matching pair</label>
+              </div>
+              <div class="row"><label>Material</label><div class="seg" id="peMat"></div></div>
+              <div class="color-row" id="peColorRow"><input type="color" id="peColor" value="#e2b007" aria-label="Part color"><span class="note">Custom color</span></div>
+              <div class="btn-row">
+                <button class="btn ghost small" id="peDup">Duplicate</button>
+                <button class="btn ghost small" id="peDel">Remove part</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="sheet">
+            <h2 class="sec">Start over</h2>
+            <div class="btn-row"><button class="btn ghost small" id="clearEdits">Clear all hand edits</button></div>
+          </div>
+        </section>
+
+        <!-- PAINT -->
+        <section data-pane="paint" class="sheet" hidden>
+          <div class="sheet">
+            <h2 class="sec">Body color</h2>
+            <div class="swatches" id="swatches"></div>
+            <div class="color-row"><input type="color" id="paintColor" value="#b3261e" aria-label="Custom body color"><span class="val" id="paintHex">#B3261E</span></div>
+          </div>
+          <div class="row"><label>Finish</label><div class="seg" id="finishSeg"></div></div>
+          <div class="sheet">
+            <h2 class="sec">Livery</h2>
+            <div class="row"><label>Stripes</label><div class="seg" id="stripeSeg"></div></div>
+            <div class="color-row"><input type="color" id="stripeColor" value="#f4f2ea" aria-label="Stripe color"><span class="note">Stripe and two-tone color</span></div>
+            <div class="field">
+              <label for="raceNumber">Racing number</label>
+              <input type="text" id="raceNumber" maxlength="3" placeholder="e.g. 27" inputmode="numeric">
+            </div>
+          </div>
+          <div class="sheet">
+            <h2 class="sec">Glass and wheels</h2>
+            <div class="row"><label for="tint">Window tint</label><output id="tintOut">50%</output><input type="range" id="tint" min="0" max="1" step="0.01" value="0.5"></div>
+            <div class="color-row"><input type="color" id="rimColor" value="#c9ced3" aria-label="Rim color"><span class="note">Rim color</span></div>
+          </div>
+          <p class="note">To paint your own windows, lights, chrome or trim straight onto the body, use Build → Paint on.</p>
+        </section>
+
+        <!-- DRIVE -->
+        <section data-pane="drive" class="sheet" hidden>
+          <p class="note">Take the current design around the test track. Its shape changes how it drives: a long wheelbase is steadier, a wide, low car corners harder, and a tall, narrow one feels tippy.</p>
+          <div class="stats" id="driveStats"></div>
+          <div class="btn-row"><button class="btn accent" id="driveStart">Start test drive</button></div>
+          <div class="sheet">
+            <h2 class="sec">Controls</h2>
+            <p class="note"><kbd>W</kbd>/<kbd>↑</kbd> throttle · <kbd>S</kbd>/<kbd>↓</kbd> brake and reverse · <kbd>A</kbd><kbd>D</kbd>/<kbd>←</kbd><kbd>→</kbd> steer · <kbd>Space</kbd> handbrake · <kbd>R</kbd> back onto the track · <kbd>Esc</kbd> leave. On a phone, use the on-screen pedals.</p>
+          </div>
+          <div class="sheet"><h2 class="sec">Best laps this visit</h2><div id="bestLaps" class="note">No laps yet.</div></div>
+        </section>
+
+        <!-- GALLERY -->
+        <section data-pane="gallery" class="sheet" hidden>
+          <div id="galleryOff" class="empty" hidden>The shared gallery works when this page is opened as a Claude artifact. Use Save → Share code to swap designs here.</div>
+          <div id="galleryOn" class="sheet" hidden>
+            <div class="field">
+              <label for="pubName">Publish this design as</label>
+              <input type="text" id="pubName" maxlength="40">
+            </div>
+            <div class="btn-row"><button class="btn accent" id="publish">Publish to gallery</button></div>
+            <p class="status" id="pubStatus" aria-live="polite"></p>
+            <div class="row"><label>Sort</label><div class="seg" id="sortSeg"></div></div>
+            <div class="gallery" id="gallery"><div class="empty">Loading the gallery…</div></div>
+          </div>
+        </section>
+
+        <!-- SAVE -->
+        <section data-pane="save" class="sheet" hidden>
+          <div class="sheet">
+            <h2 class="sec">Export</h2>
+            <div class="btn-row">
+              <button class="btn" id="expPng">Image (PNG)</button>
+              <button class="btn" id="expGlb">3D model (GLB)</button>
+            </div>
+            <div class="row"><label>STL print scale</label><div class="seg" id="scaleSeg"></div></div>
+            <div class="btn-row"><button class="btn" id="expStl">3D print (STL)</button></div>
+            <p class="note" id="expNote">Exports are saved after you confirm. In the Claude viewer, STL and GLB files arrive inside a .zip.</p>
+            <p class="status" id="expStatus" aria-live="polite"></p>
+          </div>
+          <div class="sheet">
+            <h2 class="sec">Share code</h2>
+            <p class="note">Copy this code to send the design to someone. Paste a code below to load theirs. Codes carry every hand edit.</p>
+            <textarea id="shareCode" readonly class="code" rows="3"></textarea>
+            <div class="btn-row"><button class="btn ghost" id="copyCode">Copy code</button><button class="btn ghost" id="expJson">Save design (JSON)</button></div>
+            <div class="field"><label for="importCode">Load a code</label><textarea id="importCode" class="code" rows="2" placeholder="CB2:…"></textarea></div>
+            <div class="btn-row"><button class="btn" id="loadCode">Load design</button><button class="btn ghost" id="resetDesign">Reset to default</button></div>
+            <p class="status" id="codeStatus" aria-live="polite"></p>
+          </div>
+        </section>
+      </div>
+    </aside>
+
+    <div class="stage" id="stage">
+      <div class="loading" id="loading">Loading 3D engine…</div>
+      <div class="badge-name" id="badgeName"></div>
+      <div class="stage-tools" id="stageTools">
+        <div class="grp"><button class="icon-btn" id="undoBtn" title="Undo (Ctrl+Z)" disabled>Undo</button><button class="icon-btn" id="redoBtn" title="Redo (Ctrl+Shift+Z)" disabled>Redo</button></div>
+        <div class="grp" id="viewSeg"></div>
+        <button class="icon-btn" id="spinBtn" aria-pressed="false">Spin</button>
+      </div>
+      <div class="hint" id="hint" hidden></div>
+      <div class="spec" id="spec"></div>
+      <div class="hud" id="hud" hidden>
+        <div class="laps"><span id="hudLap">Lap 1</span><span id="hudTime">0:00.00</span><span id="hudBest">Best –</span></div>
+        <div class="speedo"><span id="hudSpeed">0</span><small>km/h</small></div>
+        <button class="btn exit" id="driveExit">Back to studio</button>
+        <div class="touch left"><button data-k="left" aria-label="Steer left">◀</button><button data-k="right" aria-label="Steer right">▶</button></div>
+        <div class="touch"><button data-k="brake" aria-label="Brake">■</button><button data-k="gas" aria-label="Throttle">▲</button></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+// ---------------------------------------------------------------------------
+// Coachbuilder: build-your-own car designer. Three.js from jsDelivr (+esm bundles).
+// ---------------------------------------------------------------------------
+const V = "0.170.0";
+const CDN = `https://cdn.jsdelivr.net/npm/three@${V}`;
+let THREE, OrbitControls, GLTFExporter, STLExporter, RoomEnvironment;
+try {
+  [THREE, { OrbitControls }, { GLTFExporter }, { STLExporter }, { RoomEnvironment }] = await Promise.all([
+    import(`${CDN}/+esm`),
+    import(`${CDN}/examples/jsm/controls/OrbitControls.js/+esm`),
+    import(`${CDN}/examples/jsm/exporters/GLTFExporter.js/+esm`),
+    import(`${CDN}/examples/jsm/exporters/STLExporter.js/+esm`),
+    import(`${CDN}/examples/jsm/environments/RoomEnvironment.js/+esm`),
+  ]);
+} catch (e) {
+  document.getElementById("loading").textContent = "The 3D engine did not load. Check your connection and reload the page.";
+  throw e;
+}
+
+const $ = (s) => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+const rad = (d) => (d * Math.PI) / 180;
+const IN_CLAUDE = !!(window.claude && typeof window.claude.use === "function");
+const nowMs = () => window.performance.now();
+
+// ---------------------------------------------------------------- parameters
+const PARAMS = [
+  { k: "length", label: "Overall length", g: "Proportions", min: 3.0, max: 6.0, step: 0.01, u: "mm" },
+  { k: "width", label: "Overall width", g: "Proportions", min: 1.4, max: 2.2, step: 0.01, u: "mm" },
+  { k: "height", label: "Roof height", g: "Proportions", min: 0.9, max: 2.1, step: 0.01, u: "mm" },
+  { k: "wheelbase", label: "Wheelbase", g: "Proportions", min: 1.8, max: 3.8, step: 0.01, u: "mm" },
+  { k: "wheelOffset", label: "Axle position (cab-forward ↔ cab-back)", g: "Proportions", min: -0.6, max: 0.6, step: 0.01, u: "bias" },
+  { k: "rideHeight", label: "Ground clearance", g: "Proportions", min: 0.06, max: 0.4, step: 0.005, u: "mm" },
+  { k: "noseHeight", label: "Nose height", g: "Profile", min: 0.36, max: 1.3, step: 0.01, u: "mm" },
+  { k: "hoodLength", label: "Hood length", g: "Profile", min: 0.1, max: 0.5, step: 0.005, u: "%" },
+  { k: "rake", label: "Windshield rake", g: "Profile", min: 12, max: 72, step: 1, u: "deg" },
+  { k: "roofLength", label: "Roof length", g: "Profile", min: 0.25, max: 3.0, step: 0.01, u: "mm" },
+  { k: "rearStyle", label: "Rear end", g: "Profile", e: [["fastback", "Fastback"], ["notchback", "Notchback"], ["hatch", "Hatch"], ["wagon", "Wagon"], ["pickup", "Pickup"]] },
+  { k: "tailHeight", label: "Tail / deck height", g: "Profile", min: 0.45, max: 1.4, step: 0.01, u: "mm" },
+  { k: "beltline", label: "Beltline (window sill)", g: "Body shape", min: 0.42, max: 0.85, step: 0.005, u: "%" },
+  { k: "tumblehome", label: "Cabin taper", g: "Body shape", min: 0, max: 0.4, step: 0.005, u: "%" },
+  { k: "boxiness", label: "Boxiness", g: "Body shape", min: 2.2, max: 9, step: 0.05, u: "x" },
+  { k: "noseTaper", label: "Nose taper (plan view)", g: "Body shape", min: 0, max: 0.5, step: 0.005, u: "%" },
+  { k: "fenderFlare", label: "Fender flare", g: "Body shape", min: 0, max: 0.14, step: 0.002, u: "mm" },
+  { k: "details", label: "Automatic details", g: "Body shape", e: [["auto", "Windows and lights"], ["none", "Bare body"]] },
+  { k: "wheelDiameter", label: "Wheel diameter", g: "Wheels and aero", min: 0.5, max: 1.0, step: 0.005, u: "mm" },
+  { k: "wheelWidth", label: "Tire width", g: "Wheels and aero", min: 0.14, max: 0.4, step: 0.005, u: "mm" },
+  { k: "wheelStyle", label: "Wheel style", g: "Wheels and aero", e: [["fivespoke", "5-spoke"], ["mesh", "Mesh"], ["dish", "Dish"], ["turbofan", "Turbofan"], ["steelie", "Steel"]] },
+  { k: "spoiler", label: "Aero", g: "Wheels and aero", e: [["none", "None"], ["lip", "Splitter"], ["ducktail", "Ducktail"], ["wing", "Wing"]] },
+];
+const FINISHES = [["gloss", "Gloss"], ["metallic", "Metallic"], ["matte", "Matte"], ["chrome", "Chrome"], ["clay", "Clay"]];
+const STRIPES = [["none", "None"], ["twin", "Twin"], ["single", "Wide"], ["side", "Side"], ["twotone", "Two-tone"]];
+const SWATCHES = ["#b3261e", "#e2b007", "#1f4e8c", "#2f5d3a", "#f2f0ea", "#1a1c1e", "#8d9399", "#e86a17", "#6b2d5c", "#9fc8d6", "#b9b2a6"];
+const FINISH_ORM = { gloss: [1, 0.38, 0], metallic: [1, 0.32, 0.65], matte: [0, 0.78, 0.05], chrome: [0.4, 0.06, 1], clay: [0, 0.86, 0] }; // clearcoat, roughness, metalness
+
+const DEFAULT_PARAMS = {
+  length: 4.45, width: 1.84, height: 1.3, wheelbase: 2.68, wheelOffset: 0.05, rideHeight: 0.13,
+  noseHeight: 0.6, hoodLength: 0.3, rake: 60, roofLength: 0.95, rearStyle: "fastback", tailHeight: 0.86,
+  beltline: 0.6, tumblehome: 0.2, boxiness: 3.4, noseTaper: 0.22, fenderFlare: 0.04, details: "auto",
+  wheelDiameter: 0.68, wheelWidth: 0.25, wheelStyle: "fivespoke", spoiler: "none",
+};
+const DEFAULT_PAINT = { color: "#b3261e", finish: "metallic", stripes: "none", stripeColor: "#f4f2ea", number: "", tint: 0.5, rim: "#c9ced3" };
+
+const PRESETS = [
+  { name: "Clay block", clay: true, params: { length: 4.4, width: 1.86, height: 1.24, wheelbase: 2.7, wheelOffset: 0, rideHeight: 0.16, noseHeight: 0.98, hoodLength: 0.12, rake: 22, roofLength: 3.0, rearStyle: "wagon", tailHeight: 1.12, beltline: 0.82, tumblehome: 0, boxiness: 6.5, noseTaper: 0.04, fenderFlare: 0, details: "none", wheelDiameter: 0.68, wheelWidth: 0.24, wheelStyle: "steelie", spoiler: "none" }, paint: { color: "#b9b2a6", finish: "clay", stripes: "none", rim: "#9ea3a8" } },
+  { name: "Wedge supercar", params: { length: 4.3, width: 1.98, height: 1.08, wheelbase: 2.55, wheelOffset: -0.25, rideHeight: 0.1, noseHeight: 0.46, hoodLength: 0.26, rake: 68, roofLength: 0.6, rearStyle: "fastback", tailHeight: 0.98, beltline: 0.6, tumblehome: 0.3, boxiness: 5.2, noseTaper: 0.12, fenderFlare: 0.08, wheelDiameter: 0.7, wheelWidth: 0.32, wheelStyle: "turbofan", spoiler: "wing" }, paint: { color: "#b3261e", finish: "gloss", stripes: "none" } },
+  { name: "60s muscle", params: { length: 4.85, width: 1.86, height: 1.32, wheelbase: 2.8, wheelOffset: 0.25, rideHeight: 0.14, noseHeight: 0.78, hoodLength: 0.38, rake: 55, roofLength: 1.15, rearStyle: "notchback", tailHeight: 0.9, beltline: 0.64, tumblehome: 0.18, boxiness: 6.2, noseTaper: 0.04, fenderFlare: 0.03, wheelDiameter: 0.68, wheelWidth: 0.26, wheelStyle: "steelie", spoiler: "ducktail" }, paint: { color: "#e86a17", finish: "gloss", stripes: "twin", stripeColor: "#1a1c1e" } },
+  { name: "Hot hatch", params: { length: 3.95, width: 1.76, height: 1.45, wheelbase: 2.52, wheelOffset: 0, rideHeight: 0.13, noseHeight: 0.72, hoodLength: 0.2, rake: 60, roofLength: 1.35, rearStyle: "hatch", tailHeight: 1.0, beltline: 0.58, tumblehome: 0.16, boxiness: 4.0, noseTaper: 0.24, fenderFlare: 0.05, wheelDiameter: 0.66, wheelWidth: 0.23, wheelStyle: "fivespoke", spoiler: "lip" }, paint: { color: "#f2f0ea", finish: "gloss", stripes: "side", stripeColor: "#b3261e", number: "" } },
+  { name: "Pickup", params: { length: 5.4, width: 2.02, height: 1.88, wheelbase: 3.4, wheelOffset: 0.15, rideHeight: 0.26, noseHeight: 1.12, hoodLength: 0.22, rake: 34, roofLength: 1.2, rearStyle: "pickup", tailHeight: 1.12, beltline: 0.64, tumblehome: 0.1, boxiness: 8.0, noseTaper: 0.02, fenderFlare: 0.06, wheelDiameter: 0.86, wheelWidth: 0.3, wheelStyle: "steelie", spoiler: "none" }, paint: { color: "#2f5d3a", finish: "matte", stripes: "twotone", stripeColor: "#f2f0ea" } },
+  { name: "50s cruiser", params: { length: 5.6, width: 2.0, height: 1.42, wheelbase: 3.1, wheelOffset: 0.1, rideHeight: 0.15, noseHeight: 0.84, hoodLength: 0.33, rake: 48, roofLength: 1.4, rearStyle: "notchback", tailHeight: 0.98, beltline: 0.6, tumblehome: 0.14, boxiness: 3.6, noseTaper: 0.1, fenderFlare: 0.02, wheelDiameter: 0.7, wheelWidth: 0.21, wheelStyle: "dish", spoiler: "none" }, paint: { color: "#9fc8d6", finish: "gloss", stripes: "twotone", stripeColor: "#f2f0ea", rim: "#e6e8ea" } },
+  { name: "Le Mans racer", params: { length: 4.9, width: 2.0, height: 1.04, wheelbase: 2.9, wheelOffset: -0.1, rideHeight: 0.07, noseHeight: 0.4, hoodLength: 0.34, rake: 70, roofLength: 0.55, rearStyle: "fastback", tailHeight: 1.0, beltline: 0.66, tumblehome: 0.38, boxiness: 3.0, noseTaper: 0.3, fenderFlare: 0.12, wheelDiameter: 0.71, wheelWidth: 0.34, wheelStyle: "mesh", spoiler: "wing" }, paint: { color: "#1f4e8c", finish: "metallic", stripes: "single", stripeColor: "#e2b007", number: "27" } },
+];
+
+// ---------------------------------------------------------------- hand edits
+// Edits sit on top of the slider-made body, in body-relative coordinates
+// (u = 0 front … 1 rear, v = position around the cross-section), so they survive slider changes.
+const NS = 200, NR = 96;            // body mesh: sections along the car, points around each section
+const SGU = 128, SGV = 96;          // sculpt grid (offsets along the surface normal, metres)
+const PGU = 256, PGV = 128;         // brush-paint grid (material codes)
+const TOP_T = [0, 0.05, 0.14, 0.26, 0.38, 0.5, 0.62, 0.74, 0.86, 0.95, 1];
+const BOT_T = [0, 0.12, 0.3, 0.5, 0.7, 0.88, 1];
+const WID_T = [0, 0.06, 0.18, 0.34, 0.5, 0.66, 0.82, 0.94, 1];
+const blankEdits = () => ({ top: TOP_T.map((t) => [t, 0]), bottom: BOT_T.map((t) => [t, 0]), width: WID_T.map((t) => [t, 0]), sculpt: null, skin: null, parts: [] });
+
+// brush-paint materials: [label, color fn, clearcoat/roughness/metalness, emissive]
+const SKIN = {
+  1: { label: "Glass", color: (pt) => glassColor(pt.tint), orm: [1, 0.05, 0] },
+  2: { label: "Body", color: (pt) => pt.color, orm: null },
+  3: { label: "Stripe", color: (pt) => pt.stripeColor, orm: null },
+  4: { label: "Black", color: () => "#141517", orm: [0.3, 0.55, 0] },
+  5: { label: "Chrome", color: () => "#dfe3e8", orm: [0.5, 0.05, 1] },
+  6: { label: "Headlight", color: () => "#f2f6ff", orm: [1, 0.1, 0], glow: "#e6eeff" },
+  7: { label: "Taillight", color: () => "#a5121a", orm: [1, 0.2, 0], glow: "#d0141a" },
+  8: { label: "Amber", color: () => "#ff9a1f", orm: [1, 0.2, 0], glow: "#ff8a10" },
+  0: { label: "Erase" },
+};
+const SKIN_ORDER = [1, 2, 3, 4, 5, 6, 7, 8, 0];
+
+const PART_MATS = [["body", "Body"], ["stripe", "Stripe"], ["black", "Black"], ["chrome", "Chrome"], ["glass", "Glass"], ["light", "Light"], ["red", "Red lamp"], ["rim", "Rim"], ["custom", "Custom"]];
+const PART_TYPES = {
+  wing: { label: "Rear wing", align: false, mirror: false, mat: "body", u: 0.95, v: 0.5, icon: "M3 9h28M8 9v9M26 9v9M3 6v6M31 6v6" },
+  scoop: { label: "Hood scoop", align: true, mirror: false, mat: "body", u: 0.2, v: 0.5, icon: "M4 18h26L28 9 6 15z" },
+  vent: { label: "Side vent", align: true, mirror: true, mat: "black", u: 0.3, v: 0.21, icon: "M5 6h24v12H5zM9 10h16M9 14h16" },
+  fin: { label: "Tail fin", align: false, mirror: true, mat: "body", u: 0.88, v: 0.33, icon: "M30 18H4L26 4z" },
+  headlamp: { label: "Round lamp", align: true, mirror: true, mat: "light", u: 0.012, v: 0.37, icon: "M17 3a8 8 0 1 0 .01 0M17 7a4 4 0 1 0 .01 0" },
+  lightbar: { label: "Light strip", align: true, mirror: false, mat: "light", u: 0.012, v: 0.47, icon: "M3 10h28v5H3z" },
+  taillamp: { label: "Tail lamp", align: true, mirror: true, mat: "red", u: 0.99, v: 0.36, icon: "M6 8h22v8H6z" },
+  exhaust: { label: "Exhaust", align: false, mirror: true, mat: "chrome", u: 0.975, v: 0.1, icon: "M4 9h20v7H4zM24 7h6v11h-6z" },
+  mirror: { label: "Mirror", align: false, mirror: true, mat: "body", u: 0.33, v: 0.3, icon: "M8 6h16v10H8zM14 16v4" },
+  rack: { label: "Roof rack", align: false, mirror: false, mat: "black", u: 0.55, v: 0.5, icon: "M3 9h28M3 15h28M8 9v9M26 9v9" },
+  bullbar: { label: "Bull bar", align: false, mirror: false, mat: "black", u: 0.006, v: 0.42, icon: "M6 19V5h22v14M6 12h22" },
+  canard: { label: "Canard", align: true, mirror: true, mat: "black", u: 0.04, v: 0.3, icon: "M4 16L30 8l-4 8z" },
+  skirt: { label: "Side skirt", align: true, mirror: true, mat: "black", u: 0.5, v: 0.08, icon: "M2 14h30v4H2z" },
+  antenna: { label: "Antenna", align: false, mirror: false, mat: "black", u: 0.7, v: 0.5, icon: "M17 3v15M12 18h10" },
+  plate: { label: "Number plate", align: true, mirror: false, mat: "body", u: 0.995, v: 0.42, icon: "M5 7h24v10H5zM9 12h16" },
+  wheel: { label: "Extra wheel", align: false, mirror: true, mat: "rim", u: 0.75, v: 0.13, icon: "M17 3a9 9 0 1 0 .01 0M17 8a4 4 0 1 0 .01 0" },
+  box: { label: "Block", align: true, mirror: false, mat: "body", u: 0.5, v: 0.5, icon: "M7 8h20v12H7zM7 8l5-4h20l-5 4M27 20l5-4V4" },
+  wedge: { label: "Wedge", align: true, mirror: false, mat: "body", u: 0.5, v: 0.5, icon: "M4 19h26V7z" },
+  sphere: { label: "Dome", align: true, mirror: false, mat: "body", u: 0.5, v: 0.5, icon: "M4 19a13 13 0 0 1 26 0z" },
+  cylinder: { label: "Tube", align: true, mirror: false, mat: "body", u: 0.5, v: 0.5, icon: "M10 5h14v14H10zM10 5a7 2 0 0 0 14 0" },
+};
+let partSeq = 0;
+const newPartId = () => `p${Date.now().toString(36)}${(partSeq++).toString(36)}`;
+function newPart(type, u, v) {
+  const t = PART_TYPES[type];
+  return { id: newPartId(), type, u: u ?? t.u, v: v ?? t.v, lift: 0, yaw: 0, tilt: 0, roll: 0, size: 1, sx: 1, sy: 1, sz: 1, mat: t.mat, color: "#e2b007", align: t.align, mirror: t.mirror };
+}
+
+// --------------------------------------------------------- serialization
+function b64(u8) { let s = ""; for (let i = 0; i < u8.length; i += 32768) s += String.fromCharCode(...u8.subarray(i, i + 32768)); return btoa(s); }
+function unb64(s) { const bin = atob(s); return Uint8Array.from(bin, (c) => c.charCodeAt(0)); }
+function rleEnc(u8) { // zero runs as (0, count); everything else literal
+  const out = [];
+  for (let i = 0; i < u8.length;) {
+    if (u8[i] === 0) { let n = 0; while (i < u8.length && u8[i] === 0 && n < 255) { n++; i++; } out.push(0, n); }
+    else out.push(u8[i++]);
+  }
+  return b64(Uint8Array.from(out));
+}
+function rleDec(str, len) {
+  const src = unb64(str), out = new Uint8Array(len);
+  let o = 0;
+  for (let i = 0; i < src.length && o < len;) { const b = src[i++]; if (b === 0) o += src[i++] || 0; else out[o++] = b; }
+  return out;
+}
+function encSculpt(g) {
+  if (!g) return null;
+  const q = new Uint8Array(g.length); let any = false;
+  for (let i = 0; i < g.length; i++) { const v = clamp(Math.round(g[i] / 0.002), -127, 127); q[i] = v & 0xff; if (v) any = true; }
+  return any ? rleEnc(q) : null;
+}
+function decSculpt(s) {
+  const q = rleDec(s, SGU * SGV), g = new Float32Array(SGU * SGV);
+  for (let i = 0; i < g.length; i++) g[i] = ((q[i] << 24) >> 24) * 0.002;
+  return g;
+}
+function encSkin(k) { if (!k || !k.some((x) => x)) return null; return rleEnc(k); }
+
+function serialize(d) {
+  const e = d.edits;
+  return {
+    name: d.name, params: { ...d.params }, paint: { ...d.paint },
+    edits: { top: e.top.map((x) => [...x]), bottom: e.bottom.map((x) => [...x]), width: e.width.map((x) => [...x]), sculpt: encSculpt(e.sculpt), skin: encSkin(e.skin), parts: e.parts.map((p) => ({ ...p })) },
+  };
+}
+const hexOk = (v) => typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v);
+function cleanCurve(list, defT) {
+  if (!Array.isArray(list)) return defT.map((t) => [t, 0]);
+  let pts = list.filter((x) => Array.isArray(x) && x.length === 2 && isFinite(x[0]) && isFinite(x[1])).map(([t, d]) => [clamp(+t, 0, 1), clamp(+d, -1.5, 1.5)]);
+  pts.sort((a, b) => a[0] - b[0]);
+  pts = pts.filter((p, i) => i === 0 || p[0] - pts[i - 1][0] > 0.004).slice(0, 40);
+  if (!pts.length || pts[0][0] > 0) pts.unshift([0, pts[0]?.[1] ?? 0]);
+  if (pts[pts.length - 1][0] < 1) pts.push([1, pts[pts.length - 1][1]]);
+  pts[0][0] = 0; pts[pts.length - 1][0] = 1;
+  return pts;
+}
+function sanitize(d) {
+  const out = { name: "Untitled coupe", params: { ...DEFAULT_PARAMS }, paint: { ...DEFAULT_PAINT }, edits: blankEdits() };
+  if (!d || typeof d !== "object") return out;
+  if (typeof d.name === "string" && d.name.trim()) out.name = d.name.trim().slice(0, 40);
+  const p = d.params || {};
+  for (const def of PARAMS) {
+    const v = p[def.k];
+    if (def.e) { if (def.e.some(([id]) => id === v)) out.params[def.k] = v; }
+    else if (typeof v === "number" && isFinite(v)) out.params[def.k] = clamp(v, def.min, def.max);
+  }
+  const q = d.paint || {};
+  if (hexOk(q.color)) out.paint.color = q.color.toLowerCase();
+  if (hexOk(q.stripeColor)) out.paint.stripeColor = q.stripeColor.toLowerCase();
+  if (hexOk(q.rim)) out.paint.rim = q.rim.toLowerCase();
+  if (FINISHES.some(([id]) => id === q.finish)) out.paint.finish = q.finish;
+  if (STRIPES.some(([id]) => id === q.stripes)) out.paint.stripes = q.stripes;
+  if (typeof q.number === "string") out.paint.number = q.number.replace(/[^0-9A-Za-z]/g, "").slice(0, 3);
+  if (typeof q.tint === "number" && isFinite(q.tint)) out.paint.tint = clamp(q.tint, 0, 1);
+  const e = d.edits;
+  if (e && typeof e === "object") {
+    out.edits.top = cleanCurve(e.top, TOP_T);
+    out.edits.bottom = cleanCurve(e.bottom, BOT_T);
+    out.edits.width = cleanCurve(e.width, WID_T);
+    try {
+      if (e.sculpt instanceof Float32Array && e.sculpt.length === SGU * SGV) out.edits.sculpt = e.sculpt.map((x) => clamp(isFinite(x) ? x : 0, -0.25, 0.25));
+      else if (typeof e.sculpt === "string") out.edits.sculpt = decSculpt(e.sculpt);
+    } catch { out.edits.sculpt = null; }
+    try {
+      if (e.skin instanceof Uint8Array && e.skin.length === PGU * PGV) out.edits.skin = e.skin.map((x) => (x <= 8 ? x : 0));
+      else if (typeof e.skin === "string") out.edits.skin = rleDec(e.skin, PGU * PGV).map((x) => (x <= 8 ? x : 0));
+    } catch { out.edits.skin = null; }
+    if (Array.isArray(e.parts)) {
+      for (const r of e.parts.slice(0, 60)) {
+        if (!r || !PART_TYPES[r.type]) continue;
+        const n = (v, a, b, def) => (typeof v === "number" && isFinite(v) ? clamp(v, a, b) : def);
+        out.edits.parts.push({
+          id: typeof r.id === "string" ? r.id.slice(0, 24) : newPartId(), type: r.type,
+          u: n(r.u, 0, 1, 0.5), v: n(r.v, 0, 1, 0.5), lift: n(r.lift, -0.3, 0.9, 0),
+          yaw: n(r.yaw, -180, 180, 0), tilt: n(r.tilt, -90, 90, 0), roll: n(r.roll, -90, 90, 0),
+          size: n(r.size, 0.1, 4, 1), sx: n(r.sx, 0.1, 6, 1), sy: n(r.sy, 0.1, 6, 1), sz: n(r.sz, 0.1, 6, 1),
+          mat: PART_MATS.some(([id]) => id === r.mat) ? r.mat : PART_TYPES[r.type].mat,
+          color: hexOk(r.color) ? r.color.toLowerCase() : "#e2b007", align: !!r.align, mirror: !!r.mirror,
+        });
+      }
+    }
+  }
+  return out;
+}
+
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+const hotData = window.claude?.hot?.data;
+let design = sanitize(hotData?.design || store.get("coachbuilder.v2") || store.get("coachbuilder.design") || { name: "Untitled coupe" });
+window.claude?.hot?.snapshot?.(() => ({ design: serialize(design) }));
+function PRESET_DESIGN(i) { const pr = PRESETS[i]; return { name: pr.name, params: { ...DEFAULT_PARAMS, ...pr.params }, paint: { ...DEFAULT_PAINT, ...pr.paint } }; }
+
+// ------------------------------------------------------------- geometry core
+// Car frame: +X = front, +Y = up, Z = across. s = distance from the front bumper.
+function layout(p) {
+  const L = p.length, H = p.height, rh = p.rideHeight, W = p.width;
+  const R = p.wheelDiameter / 2;
+  const wb = Math.min(p.wheelbase, L - 2 * (R + 0.14));
+  const oh = L - wb;
+  const fo = clamp((oh / 2) * (1 + p.wheelOffset), R + 0.14, oh - (R + 0.14));
+  const beltH = rh + (H - rh) * p.beltline;
+  const noseH = clamp(p.noseHeight, rh + 0.24, H - 0.05);
+  const cowlH = Math.min(H - 0.08, Math.max(beltH + 0.03, noseH + 0.02));
+  const hoodEnd = clamp(L * p.hoodLength, 0.35, L * 0.6);
+  let roofFront = hoodEnd + Math.max(0.05, H - cowlH) * Math.tan(rad(p.rake));
+  let roofRear = roofFront + p.roofLength;
+  const maxRear = L - (p.rearStyle === "pickup" ? 1.0 : 0.3);
+  if (roofRear > maxRear) { const sh = roofRear - maxRear; roofFront = Math.max(hoodEnd + 0.15, roofFront - sh); roofRear = maxRear; }
+  if (roofRear < roofFront + 0.2) roofRear = roofFront + 0.2;
+  const tailH = clamp(p.tailHeight, rh + 0.26, H - 0.04);
+  const pts = [[0, noseH - 0.1], [0.08, noseH], [hoodEnd, cowlH], [roofFront, H]];
+  let cabinEnd;
+  switch (p.rearStyle) {
+    case "notchback": {
+      const deck = Math.min(L - 0.4, roofRear + (H - tailH) * 1.6);
+      pts.push([roofRear, H], [deck, tailH + 0.03], [L - 0.07, tailH], [L, tailH - 0.1]);
+      cabinEnd = deck; break;
+    }
+    case "hatch": {
+      const end = L - 0.05;
+      const rr = Math.max(roofFront + 0.2, Math.min(roofRear, end - (H - tailH) * 0.45));
+      pts.push([rr, H], [end - 0.02, tailH + 0.05], [L, tailH - 0.1]);
+      roofRear = rr; cabinEnd = end; break;
+    }
+    case "wagon": {
+      roofRear = Math.max(roofFront + 0.4, L - 0.24);
+      pts.push([roofRear, H - 0.02], [L - 0.05, tailH + 0.06], [L, tailH - 0.1]);
+      cabinEnd = L - 0.04; break;
+    }
+    case "pickup": {
+      const bed = Math.min(tailH, beltH + 0.04);
+      pts.push([roofRear, H], [roofRear + 0.07, bed], [L - 0.05, bed], [L, bed - 0.1]);
+      cabinEnd = roofRear + 0.04; break;
+    }
+    default: {
+      pts.push([roofRear, H], [L - 0.08, tailH], [L, tailH - 0.1]);
+      cabinEnd = L - 0.1;
+    }
+  }
+  for (let i = 1; i < pts.length; i++) if (pts[i][0] <= pts[i - 1][0]) pts[i][0] = pts[i - 1][0] + 0.01;
+  return { L, H, W, rh, R, wb, fo, sF: fo, sR: fo + wb, beltH, noseH, hoodEnd, roofFront, roofRear, cabinEnd, tailH, pts };
+}
+
+function sampleLine(pts, s) {
+  if (s <= pts[0][0]) return pts[0][1];
+  for (let i = 1; i < pts.length; i++) {
+    if (s <= pts[i][0]) { const t = (s - pts[i - 1][0]) / (pts[i][0] - pts[i - 1][0]); return lerp(pts[i - 1][1], pts[i][1], t); }
+  }
+  return pts[pts.length - 1][1];
+}
+function curveAt(pts, t) { // smooth Hermite curve through the handle points
+  const n = pts.length;
+  if (t <= pts[0][0]) return pts[0][1];
+  if (t >= pts[n - 1][0]) return pts[n - 1][1];
+  let k = 0; while (k < n - 2 && t > pts[k + 1][0]) k++;
+  const [t0, d0] = pts[k], [t1, d1] = pts[k + 1];
+  const m = (i) => { const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)]; return (b[1] - a[1]) / (b[0] - a[0] || 1); };
+  const h = t1 - t0, x = (t - t0) / h, x2 = x * x, x3 = x2 * x;
+  return (2 * x3 - 3 * x2 + 1) * d0 + (x3 - 2 * x2 + x) * h * m(k) + (-2 * x3 + 3 * x2) * d1 + (x3 - x2) * h * m(k + 1);
+}
+function sampleGrid(g, u, v) { // bilinear, wraps around the cross-section
+  const fu = clamp(u, 0, 1) * (SGU - 1), a0 = Math.min(SGU - 2, Math.floor(fu)), ta = fu - a0;
+  const fv = (v - Math.floor(v)) * SGV, b0 = Math.floor(fv) % SGV, b1 = (b0 + 1) % SGV, tb = fv - Math.floor(fv);
+  const g00 = g[a0 * SGV + b0], g01 = g[a0 * SGV + b1], g10 = g[(a0 + 1) * SGV + b0], g11 = g[(a0 + 1) * SGV + b1];
+  return lerp(lerp(g00, g01, tb), lerp(g10, g11, tb), ta);
+}
+
+function buildBody(p, e) {
+  const lay = layout(p);
+  const { L, W, rh, R, beltH } = lay;
+  const S = new Float32Array(NS), ZT = new Float32Array(NS), ZB = new Float32Array(NS), HW = new Float32Array(NS), FL = new Float32Array(NS), CAB = new Float32Array(NS);
+  const ZT0 = new Float32Array(NS), ZB0 = new Float32Array(NS), HW0 = new Float32Array(NS);
+  const raw = [];
+  for (let i = 0; i < NS; i++) { const s = (L * i) / (NS - 1); S[i] = s; raw.push(sampleLine(lay.pts, s)); }
+  const K = 6;
+  for (let i = 0; i < NS; i++) {
+    let a = 0, w = 0;
+    for (let k = -K; k <= K; k++) { const j = clamp(i + k, 0, NS - 1); const g = Math.exp(-(k * k) / 14); a += raw[j] * g; w += g; }
+    ZT0[i] = a / w;
+  }
+  for (let i = 0; i < NS; i++) {
+    const s = S[i], t = i / (NS - 1);
+    let zb = rh;
+    if (s < 0.4) zb += 0.13 * Math.pow(1 - s / 0.4, 2);
+    if (s > L - 0.45) zb += 0.11 * Math.pow(Math.min(1, (s - (L - 0.45)) / 0.45), 2);
+    ZB0[i] = zb;
+    ZT0[i] = Math.max(ZT0[i], zb + 0.16);
+    let hw = W / 2;
+    hw *= 1 - p.noseTaper * Math.pow(Math.max(0, 1 - s / 0.9), 2);
+    hw *= 1 - p.noseTaper * 0.45 * Math.pow(Math.max(0, 1 - (L - s) / 0.7), 2);
+    const rf = 0.16, rr = 0.12;
+    const fr = clamp(1 - s / rf, 0, 1), tr = clamp(1 - (L - s) / rr, 0, 1);
+    hw *= lerp(0.55, 1, Math.sqrt(1 - fr * fr));
+    hw *= lerp(0.6, 1, Math.sqrt(1 - tr * tr));
+    hw -= p.fenderFlare; // flares bulge out from a slimmer body, so overall width is measured at the arches
+    HW0[i] = hw;
+    ZB[i] = Math.max(0.03, zb + curveAt(e.bottom, t));
+    ZT[i] = Math.max(ZB[i] + 0.12, ZT0[i] + curveAt(e.top, t));
+    HW[i] = Math.max(0.06, hw + curveAt(e.width, t));
+    let f = 0;
+    for (const sa of [lay.sF, lay.sR]) f = Math.max(f, Math.exp(-Math.pow((s - sa) / (R * 1.3), 2)));
+    FL[i] = p.fenderFlare * f;
+    CAB[i] = smooth(beltH + 0.04, beltH + 0.18, ZT[i]);
+  }
+  const zWheel = W / 2 - p.wheelWidth / 2 - 0.012;
+  const innerZ = zWheel - p.wheelWidth / 2 - 0.035;
+  const wellR = R + 0.045;
+  const n = p.boxiness;
+  const cols = NR + 1, NV = NS * cols;
+  const pos = new Float32Array((NV + 2) * 3);
+  const uv = new Float32Array((NV + 2) * 2);
+  const lat = new Float32Array(NV), well = new Float32Array(NV), verOf = new Float32Array(NV);
+  for (let i = 0; i < NS; i++) {
+    const s = S[i], zt = ZT[i], zb = ZB[i], zc = (zt + zb) / 2, b = (zt - zb) / 2;
+    const flareTop = Math.min(beltH, zt) - 0.02;
+    for (let j = 0; j < cols; j++) {
+      const ph = -Math.PI / 2 + (2 * Math.PI * j) / NR;
+      const c = Math.cos(ph), sn = Math.sin(ph);
+      const la = j % (NR / 2) === 0 ? 0 : Math.sign(c) * Math.pow(Math.abs(c), 2 / n); // exact centreline at top and bottom
+      const ver = Math.sign(sn) * Math.pow(Math.abs(sn), 2 / n);
+      const Y = zc + b * ver;
+      const flareW = FL[i] * clamp((flareTop - Y) / 0.18, 0, 1) * (Y > rh - 0.01 ? 1 : 0.6);
+      let half = HW[i] + flareW;
+      if (Y > beltH) {
+        const tt = clamp((Y - beltH) / Math.max(zt - beltH, 0.05), 0, 1);
+        half = lerp(HW[i] + flareW, HW[i] * (1 - p.tumblehome * CAB[i]), Math.pow(tt, 1.35));
+      }
+      let Z = la * half, wl = 0;
+      for (const sa of [lay.sF, lay.sR]) {
+        const d = Math.hypot(s - sa, Y - R);
+        const w = 1 - smooth(wellR, wellR + 0.05, d);
+        if (w > 0 && Math.abs(Z) > innerZ) { Z = Math.sign(Z) * lerp(Math.abs(Z), innerZ, w); wl = Math.max(wl, w); }
+      }
+      const vi = i * cols + j;
+      pos[vi * 3] = L / 2 - s; pos[vi * 3 + 1] = Y; pos[vi * 3 + 2] = Z;
+      uv[vi * 2] = s / L; uv[vi * 2 + 1] = j / NR;
+      lat[vi] = Math.abs(la); well[vi] = wl; verOf[vi] = ver;
+    }
+  }
+  for (let i = 0; i < NS; i++) { // the ring's last column repeats its first exactly, so exports stay watertight
+    const a = i * cols, z = a + NR;
+    for (let o = 0; o < 3; o++) pos[z * 3 + o] = pos[a * 3 + o];
+    lat[z] = lat[a]; well[z] = well[a]; verOf[z] = verOf[a];
+  }
+  // base normals from the grid, for sculpting along the surface
+  const nrm = new Float32Array(NV * 3);
+  const P = (i, j, o) => pos[(i * cols + j) * 3 + o];
+  for (let i = 0; i < NS; i++) {
+    const im = Math.max(0, i - 1), ip = Math.min(NS - 1, i + 1);
+    for (let j = 0; j < cols; j++) {
+      const jm = j === 0 ? NR - 1 : j - 1, jp = j === NR ? 1 : j + 1;
+      const sx = P(ip, j, 0) - P(im, j, 0), sy = P(ip, j, 1) - P(im, j, 1), sz = P(ip, j, 2) - P(im, j, 2);
+      const rx = P(i, jp, 0) - P(i, jm, 0), ry = P(i, jp, 1) - P(i, jm, 1), rz = P(i, jp, 2) - P(i, jm, 2);
+      let nx = ry * sz - rz * sy, ny = rz * sx - rx * sz, nz = rx * sy - ry * sx;
+      const l = Math.hypot(nx, ny, nz);
+      if (l < 1e-9) { nx = 0; ny = 1; nz = 0; } else { nx /= l; ny /= l; nz /= l; }
+      const k = (i * cols + j) * 3; nrm[k] = nx; nrm[k + 1] = ny; nrm[k + 2] = nz;
+    }
+  }
+  const basePos = pos.slice(0, NV * 3);
+  const cF = NV, cR = NV + 1;
+  pos.set([L / 2, (ZT[0] + ZB[0]) / 2, 0], cF * 3);
+  pos.set([-L / 2, (ZT[NS - 1] + ZB[NS - 1]) / 2, 0], cR * 3);
+  uv.set([0, 0.5], cF * 2); uv.set([1, 0.5], cR * 2);
+
+  // faces: body skin (group 0) and the flat front face behind the grille (group 1)
+  const skin = [], cap = [];
+  for (let i = 0; i < NS - 1; i++) {
+    for (let j = 0; j < NR; j++) {
+      const a = i * cols + j, b2 = i * cols + j + 1, c2 = (i + 1) * cols + j, d = (i + 1) * cols + j + 1;
+      skin.push(a, b2, c2, b2, d, c2);
+    }
+  }
+  for (let j = 0; j < NR; j++) {
+    cap.push(cF, j + 1, j); // front cap faces +X
+    const o = (NS - 1) * cols;
+    skin.push(cR, o + j, o + j + 1);
+  }
+  const col = new Float32Array((NV + 2) * 3).fill(1);
+  for (let k = 0; k < NV; k++) {
+    const dark = Math.max(well[k], smooth(-0.82, -0.97, verOf[k]));
+    col[k * 3] = col[k * 3 + 1] = col[k * 3 + 2] = lerp(1, 0.05, dark);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+  geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+  geo.setIndex([...skin, ...cap]);
+  geo.addGroup(0, skin.length, 0);
+  geo.addGroup(skin.length, cap.length, 1);
+
+  // perimeter of each section (for brush and decal scaling)
+  const perS = new Float32Array(NS);
+  for (let i = 0; i < NS; i++) { let per = 0; for (let j = 0; j < NR; j++) per += Math.hypot(P(i, j + 1, 1) - P(i, j, 1), P(i, j + 1, 2) - P(i, j, 2)); perS[i] = Math.max(per, 0.2); }
+  const at = (arr, s) => { const f = clamp((s / L) * (NS - 1), 0, NS - 1), i = Math.min(NS - 2, Math.floor(f)); return lerp(arr[i], arr[i + 1], f - i); };
+  const atT = (arr, t) => at(arr, t * L);
+  const halfAt = (i, Y) => { let best = 0; for (let j = 0; j <= NR / 2; j++) { const k = i * cols + j; if (Math.abs(basePos[k * 3 + 1] - Y) < 0.05) best = Math.max(best, basePos[k * 3 + 2]); } return best; };
+  const surfX = (Y, Z, fromFront) => {
+    for (let tt = 0; tt < NS; tt++) {
+      const i = fromFront ? tt : NS - 1 - tt;
+      if (Y > ZB[i] + 0.02 && Y < ZT[i] - 0.02 && halfAt(i, Y) > Math.abs(Z) + 0.03) return { x: L / 2 - S[i], i };
+    }
+    return { x: fromFront ? L / 2 - 0.1 : -L / 2 + 0.1, i: fromFront ? 4 : NS - 5 };
+  };
+  const bPillar = lay.roofFront + (lay.roofRear - lay.roofFront) * 0.5;
+  const isGlass = (s, ph) => { // automatic window outline in (distance from front, ring angle)
+    if (p.details === "none") return false;
+    const cab = at(CAB, s);
+    if (cab < 0.55 || s > lay.cabinEnd) return false;
+    const zt = at(ZT, s), zb = at(ZB, s), c = Math.cos(ph), sn = Math.sin(ph);
+    const latA = Math.pow(Math.abs(c), 2 / n), Y = (zt + zb) / 2 + ((zt - zb) / 2) * Math.sign(sn) * Math.pow(Math.abs(sn), 2 / n);
+    if (Y < beltH + 0.04) return false;
+    const sideGlass = latA > 0.9 && Y < zt - 0.065;
+    if (s > lay.hoodEnd - 0.02 && s < lay.roofFront - 0.03) return latA < 0.8 || (latA > 0.93 && Y < zt - 0.08);
+    if (s > lay.roofRear + 0.04) return latA < 0.74 || (p.rearStyle === "wagon" && sideGlass);
+    return sideGlass && Math.abs(s - bPillar) > 0.05;
+  };
+  const vAtY = (i, Y) => { let bj = 0, bd = 9; for (let j = 0; j <= NR / 2; j++) { const d = Math.abs(basePos[(i * cols + j) * 3 + 1] - Y); if (d < bd) { bd = d; bj = j; } } return bj / NR; };
+  const doorS = lay.sF + lay.wb * 0.48;
+  const doorI = Math.round((doorS / L) * (NS - 1));
+  const body = {
+    geo, lay, S, ZT, ZB, HW, FL, ZT0, ZB0, HW0, CAB, zWheel, surfX, halfAt, at, atT, isGlass, basePos, nrm, well, perS, cols,
+    per: perS[doorI], doorS, vDoor: vAtY(doorI, rh + (beltH - rh) * 0.52), vSide: vAtY(doorI, beltH - 0.1), vBelt: vAtY(doorI, beltH),
+    W: 2 * Math.max(...HW.map((h, i) => h + FL[i])), H: Math.max(...ZT),
+    area: Math.max(...HW.map((h, i) => 2 * (h + FL[i]) * (ZT[i] - ZB[i]))) * 0.82,
+  };
+  applySculpt(body, e.sculpt);
+  return body;
+}
+function applySculpt(body, g) { // positions = base + sculpt offset along the base normal
+  const pos = body.geo.attributes.position.array, { basePos, nrm, well, cols } = body;
+  for (let i = 0; i < NS; i++) {
+    const u = i / (NS - 1);
+    for (let j = 0; j < cols; j++) {
+      const k = i * cols + j;
+      const d = g ? sampleGrid(g, u, j / NR) * (1 - well[k]) : 0;
+      pos[k * 3] = basePos[k * 3] + nrm[k * 3] * d;
+      pos[k * 3 + 1] = Math.max(0.01, basePos[k * 3 + 1] + nrm[k * 3 + 1] * d);
+      pos[k * 3 + 2] = basePos[k * 3 + 2] + nrm[k * 3 + 2] * d;
+    }
+    const a = i * cols, z = a + NR;
+    for (let o = 0; o < 3; o++) pos[z * 3 + o] = pos[a * 3 + o];
+  }
+  body.geo.attributes.position.needsUpdate = true;
+  body.geo.computeVertexNormals();
+  body.geo.computeBoundingSphere(); body.geo.computeBoundingBox();
+}
+const _a = new THREE.Vector3(), _b = new THREE.Vector3();
+function surfaceAt(body, u, v) { // point + normal on the final (sculpted) surface
+  const pos = body.geo.attributes.position.array, nor = body.geo.attributes.normal.array, cols = body.cols;
+  const fi = clamp(u, 0, 1) * (NS - 1), i0 = Math.min(NS - 2, Math.floor(fi)), ti = fi - i0;
+  const fj = clamp(v, 0, 1) * NR, j0 = Math.min(NR - 1, Math.floor(fj)), tj = fj - j0;
+  const out = { p: new THREE.Vector3(), n: new THREE.Vector3() };
+  for (const [arr, dst] of [[pos, out.p], [nor, out.n]]) {
+    for (let o = 0; o < 3; o++) {
+      const k = (ii, jj) => arr[((i0 + ii) * cols + j0 + jj) * 3 + o];
+      dst.setComponent(o, lerp(lerp(k(0, 0), k(0, 1), tj), lerp(k(1, 0), k(1, 1), tj), ti));
+    }
+  }
+  out.n.normalize();
+  return out;
+}
+
+// --------------------------------------------------------------- materials
+function glassColor(tint) { const l = lerp(0.42, 0.035, tint); const h = (x) => Math.round(clamp(x, 0, 1) * 255).toString(16).padStart(2, "0"); return `#${h(l * 0.82)}${h(l * 0.92)}${h(l)}`; }
+const hexRgb = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+const GM_W = 1024, GM_H = 512;
+function glassMask(body) { // cached boolean mask of the automatic windows
+  if (body._mask) return body._mask;
+  const w = GM_W, h = GM_H, m = new Uint8Array(w * h), L = body.lay.L;
+  for (let y = 0; y < h; y++) {
+    const ph = -Math.PI / 2 + 2 * Math.PI * (1 - (y + 0.5) / h);
+    for (let x = 0; x < w; x++) if (body.isGlass(((x + 0.5) / w) * L, ph)) m[y * w + x] = 1;
+  }
+  return (body._mask = m);
+}
+function maskCanvas(mask, w, h, colorOf) { // paint a code grid into a small canvas; colorOf(code) → [r,g,b] or null
+  const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+  const g = cv.getContext("2d"), img = g.createImageData(w, h);
+  const cache = {};
+  for (let i = 0; i < mask.length; i++) {
+    const code = mask[i]; if (!code) continue;
+    const c = code in cache ? cache[code] : (cache[code] = colorOf(code));
+    if (!c) continue;
+    img.data[i * 4] = c[0]; img.data[i * 4 + 1] = c[1]; img.data[i * 4 + 2] = c[2]; img.data[i * 4 + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  return cv;
+}
+function skinRows(skin) { // brush grid is (u, v) with v up; canvases run top-down
+  const out = new Uint8Array(PGU * PGV);
+  for (let b = 0; b < PGV; b++) for (let a = 0; a < PGU; a++) out[(PGV - 1 - b) * PGU + a] = skin[a * PGV + b];
+  return out;
+}
+function newLivery() {
+  const mk = (w, h) => { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; };
+  const cv = mk(2048, 1024), ov = mk(1024, 512), ev = mk(1024, 512);
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+  const emi = new THREE.CanvasTexture(ev); emi.colorSpace = THREE.SRGBColorSpace;
+  return { cv, ov, ev, tex, orm: new THREE.CanvasTexture(ov), emi };
+}
+function drawLivery(liv, paint, body, skin) {
+  const { cv, ov, ev } = liv, cw = cv.width, ch = cv.height;
+  const g = cv.getContext("2d");
+  g.fillStyle = paint.color; g.fillRect(0, 0, cw, ch);
+  const L = body.lay.L, P = Math.max(body.per, 1);
+  const vy = (v) => (1 - v) * ch;
+  const mv = (m) => (m / P) * ch;
+  g.fillStyle = paint.stripeColor;
+  if (paint.stripes === "twin") { const w = mv(0.2), gap = mv(0.07); g.fillRect(0, vy(0.5) - gap / 2 - w, cw, w); g.fillRect(0, vy(0.5) + gap / 2, cw, w); }
+  if (paint.stripes === "single") { const w = mv(0.42); g.fillRect(0, vy(0.5) - w / 2, cw, w); }
+  if (paint.stripes === "side") { const h = mv(0.07); g.fillRect(0, vy(body.vSide) - h / 2, cw, h); g.fillRect(0, vy(1 - body.vSide) - h / 2, cw, h); }
+  if (paint.stripes === "twotone") { g.fillRect(0, vy(body.vBelt - 0.01), cw, ch - vy(body.vBelt - 0.01)); g.fillRect(0, 0, cw, vy(1 - body.vBelt + 0.01)); }
+  if (paint.number) {
+    const pxU = cw / L, pxV = ch / P, r = 0.27;
+    for (const side of [1, -1]) {
+      g.save();
+      g.translate((body.doorS / L) * cw, vy(side > 0 ? body.vDoor : 1 - body.vDoor));
+      g.scale(pxU, pxV);
+      if (side > 0) g.scale(-1, 1); else g.scale(1, -1);
+      g.fillStyle = "#f6f5f0"; g.beginPath(); g.arc(0, 0, r, 0, Math.PI * 2); g.fill();
+      g.lineWidth = 0.025; g.strokeStyle = "#141414"; g.stroke();
+      g.fillStyle = "#141414"; g.font = "800 0.32px Archivo, Arial, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
+      g.fillText(paint.number, 0, 0.015, r * 1.6);
+      g.restore();
+    }
+  }
+  const mask = glassMask(body);
+  const skinR = skin ? skinRows(skin) : null;
+  const glassRGB = hexRgb(glassColor(paint.tint));
+  const fin = FINISH_ORM[paint.finish] || FINISH_ORM.gloss;
+  const ormOf = (code) => (SKIN[code].orm || fin).map((x) => Math.round(x * 255));
+  g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
+  g.drawImage(maskCanvas(mask, GM_W, GM_H, () => glassRGB), 0, 0, cw, ch);
+  if (skinR) g.drawImage(maskCanvas(skinR, PGU, PGV, (c) => hexRgb(SKIN[c].color(paint))), 0, 0, cw, ch);
+  // clearcoat (R) / roughness (G) / metalness (B)
+  const o = ov.getContext("2d");
+  o.fillStyle = `rgb(${fin.map((x) => Math.round(x * 255)).join(",")})`; o.fillRect(0, 0, ov.width, ov.height);
+  o.imageSmoothingEnabled = true;
+  o.drawImage(maskCanvas(mask, GM_W, GM_H, () => [255, 13, 0]), 0, 0, ov.width, ov.height);
+  if (skinR) o.drawImage(maskCanvas(skinR, PGU, PGV, ormOf), 0, 0, ov.width, ov.height);
+  // glow from brush-painted lamps
+  const eg = ev.getContext("2d");
+  eg.fillStyle = "#000"; eg.fillRect(0, 0, ev.width, ev.height);
+  if (skinR) { eg.imageSmoothingEnabled = true; eg.drawImage(maskCanvas(skinR, PGU, PGV, (c) => (SKIN[c].glow ? hexRgb(SKIN[c].glow) : null)), 0, 0, ev.width, ev.height); }
+  liv.tex.needsUpdate = liv.orm.needsUpdate = liv.emi.needsUpdate = true;
+}
+
+// -------------------------------------------------------------- car builder
+function makeMats(paint, liv) {
+  const solid = { gloss: [0, 0.38, 1], metallic: [0.65, 0.32, 1], matte: [0.05, 0.78, 0], chrome: [1, 0.06, 0.4], clay: [0, 0.86, 0] }[paint.finish] || [0, 0.38, 1];
+  const sol = (color) => new THREE.MeshPhysicalMaterial({ color: new THREE.Color(color), metalness: solid[0], roughness: solid[1], clearcoat: solid[2], clearcoatRoughness: 0.05 });
+  return {
+    paint: new THREE.MeshPhysicalMaterial({ map: liv.tex, roughnessMap: liv.orm, metalnessMap: liv.orm, clearcoatMap: liv.orm, emissiveMap: liv.emi, emissive: 0xffffff, emissiveIntensity: 1.1, roughness: 1, metalness: 1, clearcoat: 1, clearcoatRoughness: 0.05, vertexColors: true }),
+    body: sol(paint.color), stripe: sol(paint.stripeColor),
+    trim: new THREE.MeshStandardMaterial({ color: 0x15171a, roughness: 0.7, metalness: 0.1 }),
+    black: new THREE.MeshStandardMaterial({ color: 0x15171a, roughness: 0.55, metalness: 0.15 }),
+    chrome: new THREE.MeshStandardMaterial({ color: 0xe4e8ec, roughness: 0.06, metalness: 1 }),
+    glass: new THREE.MeshPhysicalMaterial({ color: new THREE.Color(glassColor(paint.tint)), roughness: 0.04, metalness: 0, clearcoat: 1 }),
+    tire: new THREE.MeshStandardMaterial({ color: 0x18191b, roughness: 0.92 }),
+    rim: new THREE.MeshStandardMaterial({ color: new THREE.Color(paint.rim), metalness: 0.9, roughness: 0.25 }),
+    light: new THREE.MeshStandardMaterial({ color: 0xf4f7ff, emissive: 0xdfe8ff, emissiveIntensity: 0.9, roughness: 0.15 }),
+    red: new THREE.MeshStandardMaterial({ color: 0x8a0d10, emissive: 0xc0141a, emissiveIntensity: 0.8, roughness: 0.3 }),
+    custom: new Map(),
+  };
+}
+function matFor(name, mats, color) {
+  if (name === "custom") { if (!mats.custom.has(color)) mats.custom.set(color, new THREE.MeshPhysicalMaterial({ color: new THREE.Color(color), roughness: 0.35, metalness: 0.1, clearcoat: 0.8 })); return mats.custom.get(color); }
+  return mats[name] || mats.body;
+}
+
+function buildCar(d, opts = {}) {
+  const p = d.params, paint = d.paint;
+  const body = buildBody(p, d.edits);
+  const lay = body.lay;
+  const car = new THREE.Group(); car.name = "car";
+  let liv = opts.reuseLivery;
+  if (!liv) { liv = newLivery(); drawLivery(liv, paint, body, d.edits.skin); }
+  const mats = makeMats(paint, liv);
+  const shell = new THREE.Mesh(body.geo, [mats.paint, mats.trim]);
+  shell.name = "body"; shell.castShadow = true; shell.receiveShadow = true;
+  car.add(shell);
+
+  if (p.details !== "none") {
+    const hl = lay.noseH - 0.12;
+    const hz = body.halfAt(4, hl) * 0.66;
+    for (const sz of [1, -1]) {
+      const at = body.surfX(hl, hz, true);
+      const m = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 12), mats.light);
+      m.scale.set(0.045, 0.05, Math.max(0.03, Math.min(0.17, hz * 0.4))); m.position.set(at.x - 0.015, hl, sz * hz); m.name = "headlight"; car.add(m);
+    }
+    {
+      const gy = Math.max(lay.rh + 0.12, hl - 0.1);
+      const at = body.surfX(gy, 0.1, true);
+      const gw = Math.max(0.3, body.halfAt(at.i, gy) * 1.15);
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.05, Math.min(0.16, lay.noseH * 0.22), gw), mats.black);
+      m.position.set(at.x - 0.012, gy, 0); m.name = "grille"; car.add(m);
+    }
+    const ty = (p.rearStyle === "pickup" ? Math.min(lay.tailH, lay.beltH + 0.04) : lay.tailH) - 0.14;
+    const tz = body.halfAt(NS - 6, ty) * 0.62;
+    for (const sz of [1, -1]) {
+      const at = body.surfX(ty, tz, false);
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.06, Math.max(0.12, tz * 0.55)), mats.red);
+      m.position.set(at.x + 0.012, ty, sz * tz); m.name = "taillight"; car.add(m);
+    }
+    const s0 = Math.min(lay.roofFront - 0.05, lay.hoodEnd + 0.22), i = Math.round((s0 / lay.L) * (NS - 1));
+    const y = lay.beltH + 0.07, hz2 = body.halfAt(i, lay.beltH + 0.02);
+    for (const sz of [1, -1]) {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.075, 0.13), mats.body);
+      m.position.set(lay.L / 2 - s0, y, sz * (hz2 + 0.1)); m.castShadow = true; m.name = "mirror"; car.add(m);
+      const stalk = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.03, 0.12), mats.trim);
+      stalk.position.set(lay.L / 2 - s0 + 0.01, y - 0.03, sz * (hz2 + 0.02)); car.add(stalk);
+    }
+  }
+  const tailTop = sampleLine(lay.pts, lay.L - 0.2) + curveAt(d.edits.top, (lay.L - 0.2) / lay.L);
+  if (p.spoiler === "wing") {
+    const span = p.width * 0.86;
+    const w = partMesh({ type: "wing", sx: 1, sy: 1, sz: span / 1.5 }, mats.body, mats, p, 1);
+    w.position.set(-lay.L / 2 + 0.22, tailTop - 0.02, 0); w.scale.z = span / 1.5; w.name = "wing"; car.add(w);
+  } else if (p.spoiler === "ducktail") {
+    const sh = new THREE.Shape(); sh.moveTo(0, 0); sh.lineTo(0.32, 0); sh.lineTo(0.34, 0.07); sh.lineTo(0.02, 0.02); sh.closePath();
+    const zt = body.halfAt(NS - 10, tailTop - 0.02) * 1.9;
+    const geo = new THREE.ExtrudeGeometry(sh, { depth: Math.max(0.4, zt), bevelEnabled: false });
+    geo.translate(0, 0, -Math.max(0.4, zt) / 2); geo.rotateY(Math.PI);
+    const m = new THREE.Mesh(geo, mats.body); m.position.set(-lay.L / 2 + 0.38, tailTop - 0.035, 0); m.castShadow = true; m.name = "ducktail"; car.add(m);
+  } else if (p.spoiler === "lip") {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.025, p.width * 0.86), mats.trim);
+    m.position.set(lay.L / 2 - 0.1, Math.max(0.03, body.ZB[3] - 0.02), 0); m.name = "splitter"; car.add(m);
+  }
+  const wheels = [];
+  for (const [sa, front] of [[lay.sF, true], [lay.sR, false]]) {
+    for (const sz of [1, -1]) {
+      const pivot = new THREE.Group(); pivot.position.set(lay.L / 2 - sa, lay.R, sz * body.zWheel); pivot.name = front ? "wheel-front" : "wheel-rear";
+      const w = buildWheel(p, mats, sz); pivot.add(w); car.add(pivot);
+      wheels.push({ pivot, spin: w, front });
+    }
+  }
+  const parts = new THREE.Group(); parts.name = "parts"; car.add(parts);
+  car.userData = { body, wheels, mats, lay, liv, parts };
+  buildParts(car, d);
+  return car;
+}
+
+function buildWheel(p, mats, side) {
+  const R = p.wheelDiameter / 2, w = p.wheelWidth;
+  const rimR = R * 0.68;
+  const grp = new THREE.Group();
+  const prof = [];
+  const steps = 14;
+  for (let k = 0; k <= steps; k++) { const a = -Math.PI / 2 + (Math.PI * k) / steps; prof.push(new THREE.Vector2(R - 0.04 + Math.cos(a) * 0.04, (w / 2 - 0.04) * Math.sign(Math.sin(a)) + Math.sin(a) * 0.04)); }
+  prof.push(new THREE.Vector2(rimR, w / 2 - 0.01), new THREE.Vector2(rimR, -w / 2 + 0.01));
+  prof.push(prof[0].clone());
+  const tire = new THREE.Mesh(new THREE.LatheGeometry(prof.reverse(), 40), mats.tire);
+  tire.rotation.x = Math.PI / 2; tire.castShadow = true; grp.add(tire);
+  const face = side * (w / 2 - 0.02);
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(rimR, rimR, w - 0.03, 32), mats.rim);
+  barrel.rotation.x = Math.PI / 2; grp.add(barrel);
+  const inner = new THREE.Mesh(new THREE.CylinderGeometry(rimR * 0.94, rimR * 0.94, 0.02, 32), mats.trim);
+  inner.rotation.x = Math.PI / 2; inner.position.z = face; grp.add(inner);
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(rimR * 0.2, rimR * 0.24, 0.05, 20), mats.rim);
+  hub.rotation.x = Math.PI / 2; hub.position.z = face + side * 0.015; grp.add(hub);
+  const spoke = (n, width, twist = 0, len = rimR * 0.82, off = 0) => {
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * Math.PI * 2 + off;
+      const m = new THREE.Mesh(new THREE.BoxGeometry(width, len, 0.03), mats.rim);
+      m.position.set((Math.cos(a) * len) / 2, (Math.sin(a) * len) / 2, face + side * 0.008);
+      m.rotation.z = a - Math.PI / 2; m.rotation.y = twist; grp.add(m);
+    }
+  };
+  switch (p.wheelStyle) {
+    case "mesh": spoke(16, 0.012, 0); spoke(16, 0.012, 0, rimR * 0.9, 0.2); break;
+    case "dish": { const d = new THREE.Mesh(new THREE.CylinderGeometry(rimR * 0.97, rimR * 0.97, 0.03, 40), mats.rim); d.rotation.x = Math.PI / 2; d.position.z = face + side * 0.006; grp.add(d); break; }
+    case "turbofan": spoke(14, 0.05, 0.5); break;
+    case "steelie": { const d = new THREE.Mesh(new THREE.CylinderGeometry(rimR * 0.95, rimR * 0.95, 0.025, 32), mats.trim); d.rotation.x = Math.PI / 2; d.position.z = face + side * 0.005; grp.add(d); const cap = new THREE.Mesh(new THREE.SphereGeometry(rimR * 0.45, 24, 12), mats.rim); cap.rotation.x = (side * Math.PI) / 2; cap.scale.y = 0.35; cap.position.z = face; grp.add(cap); break; }
+    default: spoke(5, 0.07, 0);
+  }
+  grp.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  return grp;
+}
+
+// ------------------------------------------------------------------- parts
+// Each part is modelled in a mounting frame: +Y points away from the surface, +X toward the car's front.
+function partMesh(part, mat, mats, p, side) {
+  const g = new THREE.Group();
+  const add = (geo, m, x = 0, y = 0, z = 0) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; g.add(o); return o; };
+  const ext = (pts, depth) => { const sh = new THREE.Shape(); sh.moveTo(pts[0][0], pts[0][1]); for (const q of pts.slice(1)) sh.lineTo(q[0], q[1]); sh.closePath(); const geo = new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: false }); geo.translate(0, 0, -depth / 2); return geo; };
+  switch (part.type) {
+    case "wing": {
+      for (const z of [-0.42, 0.42]) add(new THREE.BoxGeometry(0.07, 0.26, 0.03), mats.black, 0.02, 0.13, z);
+      const blade = add(new THREE.BoxGeometry(0.32, 0.035, 1.5), mat, 0, 0.27, 0); blade.rotation.z = -0.08;
+      for (const z of [-0.75, 0.75]) add(new THREE.BoxGeometry(0.36, 0.14, 0.02), mats.black, 0, 0.25, z);
+      break;
+    }
+    case "scoop": add(ext([[-0.26, 0], [0.24, 0], [0.24, 0.12], [-0.26, 0.02]], 0.42), mat); add(new THREE.BoxGeometry(0.012, 0.085, 0.34), mats.black, 0.243, 0.06, 0); break;
+    case "vent": add(new THREE.BoxGeometry(0.42, 0.02, 0.24), mats.black); for (let k = 0; k < 4; k++) add(new THREE.BoxGeometry(0.38, 0.03, 0.022), mat, 0, 0.018, -0.084 + k * 0.056); break;
+    case "fin": add(ext([[0.35, 0], [-0.42, 0], [-0.44, 0.32]], 0.03), mat); break;
+    case "headlamp": { const b = add(new THREE.CylinderGeometry(0.1, 0.1, 0.04, 32), mats.chrome, 0, 0.02, 0); b.castShadow = false; add(new THREE.CylinderGeometry(0.084, 0.084, 0.046, 32), mat, 0, 0.023, 0); break; }
+    case "lightbar": add(new THREE.BoxGeometry(0.09, 0.03, 0.58), mats.black, 0, 0.015, 0); add(new THREE.BoxGeometry(0.06, 0.036, 0.54), mat, 0, 0.018, 0); break;
+    case "taillamp": add(new THREE.BoxGeometry(0.08, 0.035, 0.32), mat, 0, 0.017, 0); break;
+    case "exhaust": { const t = add(new THREE.CylinderGeometry(0.045, 0.045, 0.3, 24), mat, -0.08, 0, 0); t.rotation.z = Math.PI / 2; const h = add(new THREE.CylinderGeometry(0.034, 0.034, 0.01, 20), mats.black, -0.231, 0, 0); h.rotation.z = Math.PI / 2; break; }
+    case "mirror": add(new THREE.BoxGeometry(0.04, 0.06, 0.04), mats.black, 0, 0.03, 0); add(new THREE.BoxGeometry(0.11, 0.08, 0.15), mat, 0, 0.09, 0); break;
+    case "rack": {
+      for (const x of [-0.45, 0.45]) { add(new THREE.BoxGeometry(0.04, 0.03, 1.3), mat, x, 0.09, 0); for (const z of [-0.6, 0.6]) add(new THREE.BoxGeometry(0.05, 0.09, 0.05), mat, x, 0.045, z); }
+      for (const z of [-0.6, 0.6]) add(new THREE.BoxGeometry(1.1, 0.03, 0.03), mat, 0, 0.115, z);
+      break;
+    }
+    case "bullbar": {
+      for (const z of [-0.36, 0.36]) add(new THREE.CylinderGeometry(0.028, 0.028, 0.5, 16), mat, 0.06, 0, z);
+      for (const y of [-0.05, 0.22]) { const b = add(new THREE.CylinderGeometry(0.028, 0.028, 0.78, 16), mat, 0.06, y, 0); b.rotation.x = Math.PI / 2; }
+      break;
+    }
+    case "canard": { const c = add(ext([[0.1, 0], [-0.1, 0], [-0.1, 0.012], [0.1, 0.004]], 0.16), mat, 0, 0.004, 0); c.rotation.x = Math.PI / 2; c.position.y = 0.08; break; }
+    case "skirt": add(new THREE.BoxGeometry(1.6, 0.04, 0.09), mat, 0, 0.02, 0); break;
+    case "antenna": add(new THREE.CylinderGeometry(0.02, 0.025, 0.03, 12), mats.black, 0, 0.015, 0); add(new THREE.CylinderGeometry(0.004, 0.006, 0.6, 8), mat, 0, 0.3, 0); break;
+    case "plate": add(new THREE.BoxGeometry(0.13, 0.012, 0.54), mats.black, 0, 0.006, 0); add(new THREE.BoxGeometry(0.11, 0.016, 0.52), mat === mats.body ? mats.chrome : mat, 0, 0.01, 0); break;
+    case "wheel": { const w = buildWheel(p, { ...mats, rim: mat }, side); w.userData.spinner = true; g.add(w); break; }
+    case "box": add(new THREE.BoxGeometry(0.3, 0.3, 0.3), mat, 0, 0.12, 0); break;
+    case "wedge": add(ext([[0.25, 0], [-0.25, 0], [-0.25, 0.2]], 0.3), mat, 0, -0.03, 0); break;
+    case "sphere": add(new THREE.SphereGeometry(0.16, 32, 18), mat, 0, 0.02, 0); break;
+    case "cylinder": add(new THREE.CylinderGeometry(0.12, 0.12, 0.3, 28), mat, 0, 0.12, 0); break;
+  }
+  return g;
+}
+const _up = new THREE.Vector3(), _fw = new THREE.Vector3(), _sd = new THREE.Vector3(), _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _qu = new THREE.Quaternion(), _eu = new THREE.Euler();
+function placePart(obj, part, body, mirrored) {
+  const sp = surfaceAt(body, part.u, mirrored ? 1 - part.v : part.v);
+  if (part.align) _up.copy(sp.n); else _up.set(0, 1, 0);
+  _fw.set(1, 0, 0).addScaledVector(_up, -_up.x);
+  if (_fw.lengthSq() < 0.09) { _fw.set(0, 1, 0).addScaledVector(_up, -_up.y); if (_fw.lengthSq() < 0.01) _fw.set(0, 0, 1); }
+  _fw.normalize();
+  _sd.crossVectors(_fw, _up).normalize();
+  _q.setFromRotationMatrix(_m4.makeBasis(_fw, _up, _sd));
+  const sg = mirrored ? -1 : 1;
+  _qu.setFromEuler(_eu.set(rad(part.roll) * sg, rad(part.yaw) * sg, rad(part.tilt), "YZX"));
+  obj.quaternion.copy(_q).multiply(_qu);
+  obj.position.copy(sp.p).addScaledVector(sp.n, part.lift);
+  obj.scale.set(part.sx, part.sy, part.sz).multiplyScalar(part.size);
+}
+function buildParts(c, d) {
+  const { parts, mats, body } = c.userData;
+  for (const o of [...parts.children]) { parts.remove(o); o.traverse((m) => m.geometry?.dispose()); }
+  c.userData.wheels = c.userData.wheels.filter((w) => !w.extra);
+  for (const part of d.edits.parts) {
+    const copies = part.mirror ? [false, true] : [false];
+    for (const mirrored of copies) {
+      const side = (mirrored ? 1 - part.v : part.v) < 0.5 ? 1 : -1;
+      const obj = partMesh(part, matFor(part.mat, mats, part.color), mats, d.params, side);
+      obj.userData = { partId: part.id, mirrored };
+      placePart(obj, part, body, mirrored);
+      parts.add(obj);
+      obj.traverse((o) => { if (o.userData.spinner) c.userData.wheels.push({ pivot: o, spin: o, front: false, extra: true }); });
+    }
+  }
+}
+function placeAllParts(c, d) {
+  const byId = new Map(d.edits.parts.map((p) => [p.id, p]));
+  for (const o of c.userData.parts.children) { const part = byId.get(o.userData.partId); if (part) placePart(o, part, c.userData.body, o.userData.mirrored); }
+}
+
+function disposeCar(o, keepLivery = false) {
+  const liv = o.userData?.liv;
+  o.traverse((m) => {
+    if (m.geometry) m.geometry.dispose();
+    if (m.material) (Array.isArray(m.material) ? m.material : [m.material]).forEach((x) => x.dispose());
+  });
+  for (const mm of o.userData?.mats?.custom?.values() || []) mm.dispose();
+  if (liv && !keepLivery) { liv.tex.dispose(); liv.orm.dispose(); liv.emi.dispose(); }
+}
+
+// ------------------------------------------------------------------ physics
+function performance(d, body) {
+  const p = d.params;
+  const lay = body?.lay || layout(p);
+  const W = body?.W || p.width, H = body?.H || p.height, area = body?.area || p.width * (p.height - p.rideHeight) * 0.84;
+  const wings = (p.spoiler === "wing" ? 1 : 0) + d.edits.parts.filter((x) => x.type === "wing").length;
+  let cd = 0.3;
+  cd += { fastback: -0.02, notchback: 0.01, hatch: 0.03, wagon: 0.04, pickup: 0.1 }[p.rearStyle] || 0;
+  cd -= (p.rake - 55) * 0.0018;
+  cd += (p.noseHeight - 0.6) * 0.12;
+  cd += (p.boxiness - 3.5) * 0.012;
+  cd -= p.tumblehome * 0.06;
+  cd += wings * 0.035 + (p.spoiler === "ducktail" ? -0.005 : p.spoiler === "lip" ? 0.005 : 0);
+  cd += p.fenderFlare * 0.3 + Math.min(0.08, d.edits.parts.length * 0.004);
+  cd = clamp(cd, 0.22, 0.7);
+  const mass = 520 + 95 * p.length * W * H;
+  const power = 230000; // W, same engine in every design so the shape is what changes
+  const vmax = Math.cbrt((2 * power) / (1.2 * cd * area));
+  const mu = 1.0 + (p.wheelWidth - 0.22) * 1.6 + Math.min(0.16, wings * 0.08) + (p.spoiler === "lip" ? 0.03 : 0);
+  const cg = p.rideHeight + (H - p.rideHeight) * 0.36;
+  const track = p.width - p.wheelWidth;
+  const rollG = track / 2 / cg;
+  const latG = Math.min(mu, rollG * 0.85);
+  let v = 0, t = 0;
+  while (v < 27.78 && t < 30) { const F = Math.min(mu * mass * 9.81 * 0.55, power / Math.max(v, 1)) - 0.5 * 1.2 * cd * area * v * v - 0.015 * mass * 9.81; v += (F / mass) * 0.01; t += 0.01; }
+  return { cd, area, mass, vmax, latG, rollG, t100: t, mu, wb: lay.wb, track, cg, W, H };
+}
+
+// ------------------------------------------------------------------- scene
+const stage = $("#stage");
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+stage.prepend(renderer.domElement);
+$("#loading").remove();
+
+const scene = new THREE.Scene();
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+const camera = new THREE.PerspectiveCamera(32, 1, 0.05, 2000);
+camera.position.set(6.2, 2.4, 6.8);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.target.set(0, 0.6, 0); controls.minDistance = 2; controls.maxDistance = 18; controls.maxPolarAngle = Math.PI * 0.495;
+
+const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+sun.position.set(4, 9, 5); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -6, right: 6, top: 6, bottom: -6, near: 1, far: 30 });
+sun.shadow.bias = -0.0004; sun.shadow.radius = 6;
+scene.add(sun, sun.target, new THREE.HemisphereLight(0xffffff, 0x8a8f8c, 0.5));
+
+const studio = new THREE.Group(); scene.add(studio);
+const floor = new THREE.Mesh(new THREE.CircleGeometry(9, 64), new THREE.ShadowMaterial({ opacity: 0.28 }));
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; studio.add(floor);
+const grid = new THREE.GridHelper(12, 12, 0x000000, 0x000000); grid.material.opacity = 0.07; grid.material.transparent = true; studio.add(grid);
+const overlay = new THREE.Group(); scene.add(overlay); // handles, brush ring, selection box
+
+let car = null, fullTimer = 0;
+function rebuild(fast = false) {
+  const prev = car;
+  const reuse = fast && prev ? prev.userData.liv : null;
+  car = buildCar(design, { reuseLivery: reuse });
+  if (prev) { car.position.copy(prev.position); car.rotation.copy(prev.rotation); scene.remove(prev); disposeCar(prev, !!reuse); }
+  scene.add(car);
+  if (mode === "drive") placeOnTrack(false);
+  updateReadouts(); refreshOverlay();
+  clearTimeout(fullTimer);
+  if (fast) fullTimer = setTimeout(() => rebuild(false), 260);
+}
+let rebuildQueued = 0; // 1 = fast (keep textures), 2 = full
+function queueRebuild(fast = true) {
+  const lvl = fast ? 1 : 2;
+  if (rebuildQueued) { rebuildQueued = Math.max(rebuildQueued, lvl); return; }
+  rebuildQueued = lvl;
+  requestAnimationFrame(() => { const f = rebuildQueued === 1; rebuildQueued = 0; rebuild(f); });
+}
+function redrawLivery() { if (!car) return; drawLivery(car.userData.liv, design.paint, car.userData.body, design.edits.skin); }
+
+function resize() {
+  const r = stage.getBoundingClientRect();
+  renderer.setSize(r.width, r.height, false);
+  camera.aspect = r.width / Math.max(r.height, 1);
+  camera.fov = Math.max(32, (2 * Math.atan(0.4588 / camera.aspect) * 180) / Math.PI); // keep the studio's horizontal view on narrow screens
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage);
+
+// ------------------------------------------------------------------ history
+const hist = { stack: [], i: -1 };
+function pushHistory() {
+  const s = JSON.stringify(serialize(design));
+  if (hist.stack[hist.i] === s) return;
+  hist.stack = hist.stack.slice(0, hist.i + 1); hist.stack.push(s);
+  if (hist.stack.length > 80) hist.stack.shift();
+  hist.i = hist.stack.length - 1; updateUndo();
+  store.set("coachbuilder.v2", JSON.parse(s));
+}
+function restore(s) { tweenId++; design = sanitize(JSON.parse(s)); selPart = null; selHandle = null; syncUI(); rebuild(false); updateUndo(); }
+function undo() { if (hist.i > 0) { hist.i--; restore(hist.stack[hist.i]); } }
+function redo() { if (hist.i < hist.stack.length - 1) { hist.i++; restore(hist.stack[hist.i]); } }
+function updateUndo() { $("#undoBtn").disabled = hist.i <= 0; $("#redoBtn").disabled = hist.i >= hist.stack.length - 1; }
+let commitTimer = 0;
+const commitSoon = () => { clearTimeout(commitTimer); commitTimer = setTimeout(pushHistory, 450); };
+
+// ----------------------------------------------------------- build tools
+let tab = "shape", tool = "handles", selPart = null, selHandle = null;
+const brush = { mode: "pull", size: 0.22, strength: 0.45, mirror: true, mat: 1, psize: 0.08, pmirror: true };
+const show = { top: true, width: true, bottom: true };
+const ray = new THREE.Raycaster(); ray.params.Line.threshold = 0.05;
+const ndc = new THREE.Vector2();
+function aim(e) { const r = renderer.domElement.getBoundingClientRect(); ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); ray.setFromCamera(ndc, camera); }
+function overCanvas(e) { const r = renderer.domElement.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; }
+function hitBody() { const b = car?.getObjectByName("body"); return b ? ray.intersectObject(b, false)[0] || null : null; }
+const toolActive = () => tab === "build" && mode === "studio";
+
+const HCOL = { top: 0x0b6e8a, bottom: 0xb5651d, width: 0x7a3fb0 };
+const handleGeo = new THREE.SphereGeometry(1, 16, 10);
+function clearOverlay() {
+  for (const o of [...overlay.children]) {
+    overlay.remove(o);
+    if (o === brushRing || o === selBox) continue;
+    if (o.geometry !== handleGeo) o.geometry?.dispose();
+    o.material?.dispose();
+  }
+}
+const brushRing = new THREE.Mesh(new THREE.RingGeometry(0.9, 1, 48), new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false, transparent: true, opacity: 0.85, side: THREE.DoubleSide }));
+brushRing.renderOrder = 20;
+const selBox = new THREE.Box3Helper(new THREE.Box3(), 0x0b6e8a); selBox.material.depthTest = false; selBox.renderOrder = 19;
+function handlePoint(set, k) {
+  const b = car.userData.body, [t] = design.edits[set][k], L = b.lay.L, x = L / 2 - t * L;
+  if (set === "top") return new THREE.Vector3(x, b.atT(b.ZT, t), 0);
+  if (set === "bottom") return new THREE.Vector3(x, b.atT(b.ZB, t), 0);
+  return new THREE.Vector3(x, widthY(b, t), b.atT(b.HW, t) + b.atT(b.FL, t));
+}
+const widthY = (b, t) => { const zb = b.atT(b.ZB, t), zt = b.atT(b.ZT, t); return zb + (Math.min(b.lay.beltH, zt) - zb) * 0.55; };
+function refreshOverlay() {
+  clearOverlay();
+  if (!car || !toolActive()) return;
+  const b = car.userData.body, L = b.lay.L;
+  if (tool === "handles") {
+    const lineOf = (pts, color, name) => { const g = new THREE.BufferGeometry().setFromPoints(pts); const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color, depthTest: false, transparent: true, opacity: 0.9 })); l.renderOrder = 15; l.userData.curve = name; overlay.add(l); };
+    const xs = []; for (let i = 0; i < NS; i += 2) xs.push(i);
+    if (show.top) lineOf(xs.map((i) => new THREE.Vector3(L / 2 - b.S[i], b.ZT[i], 0)), HCOL.top, "top");
+    if (show.bottom) lineOf(xs.map((i) => new THREE.Vector3(L / 2 - b.S[i], b.ZB[i], 0)), HCOL.bottom, "bottom");
+    if (show.width) for (const sz of [1, -1]) lineOf(xs.map((i) => { const t = i / (NS - 1); return new THREE.Vector3(L / 2 - b.S[i], widthY(b, t), sz * (b.HW[i] + b.FL[i])); }), HCOL.width, "width");
+    for (const set of ["top", "bottom", "width"]) {
+      if (!show[set]) continue;
+      design.edits[set].forEach((_, k) => {
+        for (const sz of set === "width" ? [1, -1] : [1]) {
+          const sel = selHandle && selHandle.set === set && selHandle.k === k;
+          const m = new THREE.Mesh(handleGeo, new THREE.MeshBasicMaterial({ color: sel ? 0xffffff : HCOL[set], depthTest: false }));
+          const pt = handlePoint(set, k); pt.z *= sz;
+          m.position.copy(pt); m.scale.setScalar(sel ? 0.065 : 0.048); m.renderOrder = 16; m.userData = { handle: { set, k } };
+          overlay.add(m);
+        }
+      });
+    }
+  }
+  if (tool === "parts" && selPart) {
+    const box = new THREE.Box3();
+    for (const o of car.userData.parts.children) if (o.userData.partId === selPart) box.expandByObject(o);
+    if (!box.isEmpty()) { selBox.box.copy(box.expandByScalar(0.02)); overlay.add(selBox); }
+  }
+  overlay.add(brushRing); brushRing.visible = false;
+}
+
+// handles: drag points in the side or plan plane; click the line to add a point
+let drag = null;
+const plane = new THREE.Plane(), hitPt = new THREE.Vector3();
+function handleDown(e) {
+  const hits = ray.intersectObjects(overlay.children.filter((o) => o.userData.handle), false);
+  if (hits.length) { const h = hits[0].object.userData.handle; selHandle = h; startHandleDrag(h, hits[0].object.position.y); return true; }
+  const lines = ray.intersectObjects(overlay.children.filter((o) => o.userData.curve), false);
+  if (lines.length) {
+    const set = lines[0].object.userData.curve, b = car.userData.body, L = b.lay.L;
+    const t = clamp((L / 2 - lines[0].point.x) / L, 0.01, 0.99);
+    const pts = design.edits[set];
+    if (pts.some(([pt]) => Math.abs(pt - t) < 0.012) || pts.length >= 40) return false;
+    pts.push([t, curveAt(pts, t)]); pts.sort((a, c) => a[0] - c[0]);
+    selHandle = { set, k: pts.findIndex(([pt]) => pt === t) };
+    refreshOverlay(); updateBuildUI();
+    startHandleDrag(selHandle, lines[0].point.y);
+    drag.moved = true; // adding the dot is itself an edit, even without a drag
+    return true;
+  }
+  if (selHandle) { selHandle = null; refreshOverlay(); updateBuildUI(); }
+  return false;
+}
+function startHandleDrag(h, y0) {
+  if (h.set === "width") plane.set(new THREE.Vector3(0, 1, 0), -y0); else plane.set(new THREE.Vector3(0, 0, 1), 0);
+  drag = { kind: "handle", h, moved: false };
+  updateBuildUI(); refreshOverlay();
+}
+function handleMove() {
+  if (!ray.ray.intersectPlane(plane, hitPt)) return;
+  const { set, k } = drag.h, pts = design.edits[set], b = car.userData.body, L = b.lay.L;
+  const end = k === 0 || k === pts.length - 1;
+  const t = end ? pts[k][0] : clamp((L / 2 - hitPt.x) / L, pts[k - 1][0] + 0.01, pts[k + 1][0] - 0.01);
+  let d;
+  if (set === "top") d = hitPt.y - b.atT(b.ZT0, t);
+  else if (set === "bottom") d = hitPt.y - b.atT(b.ZB0, t);
+  else d = Math.abs(hitPt.z) - (b.atT(b.HW0, t) + b.atT(b.FL, t));
+  pts[k] = [t, clamp(d, -1.5, 1.5)];
+  drag.moved = true;
+  queueRebuild(true);
+}
+
+// sculpt + paint brushes work in body coordinates, so they follow slider changes
+function stampSculpt(u0, v0, dt) {
+  const b = car.userData.body, L = b.lay.L;
+  const g = design.edits.sculpt || (design.edits.sculpt = new Float32Array(SGU * SGV));
+  const r = brush.size, per = b.perS[Math.round(u0 * (NS - 1))];
+  const one = (vc) => {
+    const a0 = Math.max(0, Math.floor((u0 - r / L) * (SGU - 1))), a1 = Math.min(SGU - 1, Math.ceil((u0 + r / L) * (SGU - 1)));
+    const bs = Math.ceil((r / per) * SGV) + 1, bc = Math.round(vc * SGV);
+    const src = brush.mode === "smooth" ? g.slice() : null;
+    for (let a = a0; a <= a1; a++) {
+      const du = (a / (SGU - 1) - u0) * L;
+      for (let bb = bc - bs; bb <= bc + bs; bb++) {
+        const bi = ((bb % SGV) + SGV) % SGV;
+        let dv = bi / SGV - vc; dv -= Math.round(dv);
+        const dist = Math.hypot(du, dv * per);
+        if (dist >= r) continue;
+        const w = Math.pow(1 - (dist / r) ** 2, 2), k = a * SGV + bi;
+        if (brush.mode === "pull") g[k] += w * brush.strength * 0.22 * dt;
+        else if (brush.mode === "push") g[k] -= w * brush.strength * 0.22 * dt;
+        else if (brush.mode === "erase") g[k] -= g[k] * Math.min(1, brush.strength * 8 * dt) * w;
+        else {
+          const nb = (aa, bb2) => src[clamp(aa, 0, SGU - 1) * SGV + ((bb2 % SGV) + SGV) % SGV];
+          const avg = (nb(a - 1, bi) + nb(a + 1, bi) + nb(a, bi - 1) + nb(a, bi + 1)) / 4;
+          g[k] += (avg - g[k]) * Math.min(1, brush.strength * 12 * dt) * w;
+        }
+        g[k] = clamp(g[k], -0.25, 0.25);
+      }
+    }
+  };
+  one(v0);
+  const fromCenter = Math.min(Math.abs(v0 - 0.5), v0, 1 - v0) * per;
+  if (brush.mirror && fromCenter > r * 0.35) one(1 - v0);
+}
+function stampPaint(u0, v0) {
+  const b = car.userData.body, L = b.lay.L;
+  const k = design.edits.skin || (design.edits.skin = new Uint8Array(PGU * PGV));
+  const r = brush.psize, per = b.perS[Math.round(u0 * (NS - 1))];
+  const one = (vc) => {
+    const a0 = Math.max(0, Math.floor((u0 - r / L) * PGU)), a1 = Math.min(PGU - 1, Math.ceil((u0 + r / L) * PGU));
+    const bs = Math.ceil((r / per) * PGV) + 1, bc = Math.round(vc * PGV);
+    for (let a = a0; a <= a1; a++) {
+      const du = ((a + 0.5) / PGU - u0) * L;
+      for (let bb = bc - bs; bb <= bc + bs; bb++) {
+        const bi = ((bb % PGV) + PGV) % PGV;
+        let dv = (bi + 0.5) / PGV - vc; dv -= Math.round(dv);
+        if (Math.hypot(du, dv * per) < r) k[a * PGV + bi] = brush.mat;
+      }
+    }
+  };
+  one(v0);
+  if (brush.pmirror && Math.min(Math.abs(v0 - 0.5), v0, 1 - v0) * per > r * 0.5) one(1 - v0);
+}
+function showRing(hit) {
+  if (!hit) { brushRing.visible = false; return; }
+  const n = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+  brushRing.position.copy(hit.point).addScaledVector(n, 0.006);
+  brushRing.lookAt(hit.point.clone().add(n));
+  brushRing.scale.setScalar(tool === "sculpt" ? brush.size : brush.psize);
+  brushRing.visible = true;
+}
+
+// parts: pick, slide along the body, drop from the bin
+function partHit() {
+  const hits = ray.intersectObjects(car.userData.parts.children, true);
+  for (const h of hits) { let o = h.object; while (o && !o.userData.partId) o = o.parent; if (o) return o; }
+  return null;
+}
+function partsDown() {
+  const o = partHit();
+  if (o) { selPart = o.userData.partId; drag = { kind: "part", id: selPart, mirrored: o.userData.mirrored, moved: false }; updateBuildUI(); refreshOverlay(); return true; }
+  if (selPart && hitBody()) { selPart = null; updateBuildUI(); refreshOverlay(); }
+  return false;
+}
+function slidePart(id, mirrored) {
+  const h = hitBody(); if (!h || h.face.materialIndex !== 0) return false;
+  const part = design.edits.parts.find((p) => p.id === id); if (!part) return false;
+  part.u = clamp(h.uv.x, 0, 1); part.v = clamp(mirrored ? 1 - h.uv.y : h.uv.y, 0, 1);
+  placeAllParts(car, design); refreshOverlay();
+  return true;
+}
+
+// pointer routing: tools take the pointer when it lands on something they edit; otherwise the camera orbits
+let stroke = null;
+stage.addEventListener("pointerdown", (e) => {
+  if (!toolActive() || !car || e.button > 0 || !overCanvas(e) || e.target !== renderer.domElement) return;
+  aim(e);
+  let took = false;
+  if (tool === "handles") took = handleDown(e);
+  else if (tool === "sculpt" || tool === "paint") {
+    const h = hitBody();
+    if (h) { took = true; stroke = { uv: h.uv.clone(), last: h.uv.clone(), hit: h }; if (tool === "paint") { stampPaint(h.uv.x, h.uv.y); redrawLivery(); } }
+  } else if (tool === "parts") took = partsDown();
+  if (took) { e.stopPropagation(); e.preventDefault(); renderer.domElement.setPointerCapture?.(e.pointerId); }
+}, { capture: true });
+addEventListener("pointermove", (e) => {
+  if (!car || mode !== "studio") return;
+  if (binDrag) { binMove(e); return; }
+  if (!toolActive()) return;
+  aim(e);
+  if (drag?.kind === "handle") handleMove();
+  else if (drag?.kind === "part") { if (slidePart(drag.id, drag.mirrored)) drag.moved = true; }
+  else if (tool === "sculpt" || tool === "paint") {
+    const h = overCanvas(e) ? hitBody() : null;
+    showRing(h);
+    if (stroke && h) {
+      if (tool === "paint") { // stamp along the path so quick strokes stay continuous
+        const L = car.userData.body.lay.L, du = (h.uv.x - stroke.last.x) * L, dv = (h.uv.y - stroke.last.y) * 3;
+        const steps = Math.min(30, Math.ceil(Math.hypot(du, dv) / (brush.psize * 0.4)));
+        for (let s = 1; s <= steps; s++) stampPaint(lerp(stroke.last.x, h.uv.x, s / steps), lerp(stroke.last.y, h.uv.y, s / steps));
+        redrawLivery();
+      }
+      stroke.last.copy(h.uv); stroke.hit = h;
+    } else if (stroke) stroke.hit = null;
+  }
+});
+function endPointer() {
+  if (binDrag) { binUp(); return; }
+  if (drag) { const moved = drag.moved; drag = null; if (moved) { rebuild(false); pushHistory(); } }
+  if (stroke) { stroke = null; if (tool === "sculpt") { placeAllParts(car, design); } pushHistory(); }
+}
+addEventListener("pointerup", endPointer);
+addEventListener("pointercancel", endPointer);
+function sculptTick(dt) {
+  if (!stroke || tool !== "sculpt" || !stroke.hit) return;
+  stampSculpt(stroke.last.x, stroke.last.y, dt);
+  applySculpt(car.userData.body, design.edits.sculpt);
+  placeAllParts(car, design);
+}
+
+// parts bin: drag a tile onto the car, or tap it to add the part in its usual spot
+let binDrag = null;
+function binStart(e, type) {
+  e.preventDefault();
+  binDrag = { type, x: e.clientX, y: e.clientY, moved: false, part: null, ghost: null };
+}
+function binMove(e) {
+  const d = binDrag;
+  if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 6) return;
+  if (!d.moved) { d.moved = true; d.ghost = document.createElement("div"); d.ghost.className = "drag-ghost"; d.ghost.textContent = PART_TYPES[d.type].label; document.body.append(d.ghost); }
+  d.ghost.style.left = `${e.clientX}px`; d.ghost.style.top = `${e.clientY}px`;
+  const h = overCanvas(e) ? (aim(e), hitBody()) : null;
+  if (h && h.face.materialIndex === 0) {
+    if (!d.part) { d.part = newPart(d.type, h.uv.x, h.uv.y); design.edits.parts.push(d.part); buildParts(car, design); }
+    else { d.part.u = h.uv.x; d.part.v = h.uv.y; placeAllParts(car, design); }
+  } else if (d.part) { design.edits.parts = design.edits.parts.filter((p) => p !== d.part); d.part = null; buildParts(car, design); }
+}
+function binUp() {
+  const d = binDrag; binDrag = null; d.ghost?.remove();
+  if (!d.moved) { const part = newPart(d.type); design.edits.parts.push(part); selPart = part.id; buildParts(car, design); }
+  else if (d.part) selPart = d.part.id;
+  else return;
+  updateReadouts(); updateBuildUI(); refreshOverlay(); pushHistory();
+}
+
+// ------------------------------------------------------------------- drive
+let mode = "studio";
+let track = null;
+const keys = new Set();
+const sim = { x: 0, z: 0, psi: 0, theta: 0, v: 0, steer: 0, idx: 0, lap: 0, lapStart: 0, best: null, half: false };
+const bestLaps = [];
+
+function buildTrack() {
+  const ctrl = [[0, 0], [110, 0], [165, -30], [175, -95], [125, -140], [70, -120], [40, -75], [-10, -95], [-75, -130], [-130, -95], [-140, -30], [-95, 20], [-45, 18]].map(([x, z]) => new THREE.Vector3(x, 0, z));
+  const curve = new THREE.CatmullRomCurve3(ctrl, true, "centripetal");
+  const N = 900, half = 7;
+  const pts = curve.getSpacedPoints(N);
+  const samples = [];
+  const pos = [], idx = [], curbPos = [], curbCol = [];
+  for (let i = 0; i <= N; i++) {
+    const a = pts[i % N], b = pts[(i + 1) % N];
+    const t = new THREE.Vector3().subVectors(b, a).normalize();
+    const nrm = new THREE.Vector3(-t.z, 0, t.x);
+    samples.push({ p: a.clone(), n: nrm.clone(), t: t.clone() });
+    const l = a.clone().addScaledVector(nrm, half), r = a.clone().addScaledVector(nrm, -half);
+    pos.push(l.x, 0.01, l.z, r.x, 0.01, r.z);
+    const stripe = Math.floor(i / 3) % 2 ? [0.82, 0.12, 0.1] : [0.95, 0.95, 0.93];
+    for (const sgn of [1, -1]) {
+      const o = a.clone().addScaledVector(nrm, sgn * half), o2 = a.clone().addScaledVector(nrm, sgn * (half + 1.1));
+      curbPos.push(o.x, 0.03, o.z, o2.x, 0.03, o2.z); curbCol.push(...stripe, ...stripe);
+    }
+    if (i < N) { const k = i * 2; idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
+  }
+  const g = new THREE.Group();
+  const road = new THREE.BufferGeometry(); road.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); road.setIndex(idx); road.computeVertexNormals();
+  const roadMesh = new THREE.Mesh(road, new THREE.MeshStandardMaterial({ color: 0x3b3f44, roughness: 0.95, side: THREE.DoubleSide })); roadMesh.receiveShadow = true;
+  const cidx = [];
+  for (let i = 0; i < N; i++) for (const sOff of [0, 2]) { const k = i * 4 + sOff, k2 = (i + 1) * 4 + sOff; cidx.push(k, k + 1, k2, k + 1, k2 + 1, k2); }
+  const curb = new THREE.BufferGeometry(); curb.setAttribute("position", new THREE.Float32BufferAttribute(curbPos, 3)); curb.setAttribute("color", new THREE.Float32BufferAttribute(curbCol, 3)); curb.setIndex(cidx); curb.computeVertexNormals();
+  const curbMesh = new THREE.Mesh(curb, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, side: THREE.DoubleSide })); curbMesh.receiveShadow = true;
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200), new THREE.MeshStandardMaterial({ color: 0x6f8a5a, roughness: 1 }));
+  ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true;
+  const cv = document.createElement("canvas"); cv.width = 32; cv.height = 224; const cg = cv.getContext("2d");
+  for (let x = 0; x < 4; x++) for (let y = 0; y < 28; y++) { cg.fillStyle = (x + y) % 2 ? "#111" : "#f4f4f4"; cg.fillRect(x * 8, y * 8, 8, 8); }
+  const lineTex = new THREE.CanvasTexture(cv); lineTex.colorSpace = THREE.SRGBColorSpace; lineTex.magFilter = THREE.NearestFilter;
+  const lineGeo = new THREE.PlaneGeometry(2, half * 2); lineGeo.rotateX(-Math.PI / 2);
+  const line = new THREE.Mesh(lineGeo, new THREE.MeshBasicMaterial({ map: lineTex }));
+  line.position.set(samples[0].p.x, 0.02, samples[0].p.z); line.rotation.y = Math.atan2(-samples[0].t.z, samples[0].t.x);
+  const treeGeo = new THREE.ConeGeometry(2.2, 7, 7); treeGeo.translate(0, 3.5, 0);
+  const trees = new THREE.InstancedMesh(treeGeo, new THREE.MeshStandardMaterial({ color: 0x2f4b2c, roughness: 1 }), 260);
+  const m4 = new THREE.Matrix4(); let placed = 0, seed = 7;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  while (placed < 260) {
+    const x = rnd() * 520 - 250, z = rnd() * 420 - 290;
+    let near = 1e9; for (let i = 0; i < N; i += 6) near = Math.min(near, Math.hypot(samples[i].p.x - x, samples[i].p.z - z));
+    if (near < 18) continue;
+    const s = 0.7 + rnd() * 0.8; m4.compose(new THREE.Vector3(x, 0, z), new THREE.Quaternion(), new THREE.Vector3(s, s, s)); trees.setMatrixAt(placed++, m4);
+  }
+  trees.castShadow = true;
+  g.add(ground, roadMesh, curbMesh, line, trees);
+  return { group: g, samples, N, half };
+}
+function placeOnTrack(resetLap = true) {
+  if (resetLap) { sim.idx = 0; sim.lap = 1; sim.lapStart = nowMs(); sim.half = false; }
+  const s = track.samples[sim.idx % track.N];
+  sim.x = s.p.x; sim.z = s.p.z; sim.psi = sim.theta = Math.atan2(-s.t.z, s.t.x); sim.v = 0;
+}
+let stats = null;
+function enterDrive() {
+  if (!track) { track = buildTrack(); scene.add(track.group); }
+  track.group.visible = true; studio.visible = false; overlay.visible = false;
+  mode = "drive"; controls.enabled = false;
+  $("#hud").hidden = false; $("#stageTools").hidden = true; $("#spec").hidden = true; $("#badgeName").hidden = true; $("#hint").hidden = true;
+  Object.assign(sun.shadow.camera, { left: -25, right: 25, top: 25, bottom: -25, far: 80 }); sun.shadow.camera.updateProjectionMatrix();
+  scene.background = new THREE.Color(0xbcd3e3); scene.fog = new THREE.Fog(0xbcd3e3, 120, 520);
+  placeOnTrack(true);
+  stats = performance(design, car.userData.body);
+  const fx = Math.cos(sim.psi), fz = -Math.sin(sim.psi);
+  camera.position.set(sim.x - fx * (design.params.length + 4.5), 2.2 + design.params.height * 0.7, sim.z - fz * (design.params.length + 4.5));
+}
+function exitDrive() {
+  mode = "studio"; controls.enabled = true; keys.clear();
+  track.group.visible = false; studio.visible = true; overlay.visible = true;
+  $("#hud").hidden = true; $("#stageTools").hidden = false; $("#spec").hidden = false; $("#badgeName").hidden = false;
+  Object.assign(sun.shadow.camera, { left: -6, right: 6, top: 6, bottom: -6, far: 30 }); sun.shadow.camera.updateProjectionMatrix();
+  sun.position.set(4, 9, 5); sun.target.position.set(0, 0, 0);
+  scene.background = null; scene.fog = null;
+  car.position.set(0, 0, 0); car.rotation.set(0, 0, 0, "XYZ");
+  for (const w of car.userData.wheels) if (w.front) w.pivot.rotation.y = 0;
+  setView("34"); updateHint();
+}
+function stepDrive(dt) {
+  const p = design.params, st = stats;
+  const gas = keys.has("gas"), brake = keys.has("brake"), hb = keys.has("hand");
+  const steerIn = (keys.has("left") ? 1 : 0) - (keys.has("right") ? 1 : 0);
+  const maxSteer = 0.6 / (1 + Math.abs(sim.v) / 16);
+  sim.steer = lerp(sim.steer, steerIn * maxSteer, 1 - Math.exp(-dt * 7));
+  let bi = sim.idx, bd = 1e9;
+  for (let k = -25; k <= 40; k++) { const i = (sim.idx + k + track.N) % track.N; const s = track.samples[i]; const d = (s.p.x - sim.x) ** 2 + (s.p.z - sim.z) ** 2; if (d < bd) { bd = d; bi = i; } }
+  const prev = sim.idx; sim.idx = bi;
+  const off = Math.sqrt(bd) > track.half + 0.6;
+  const g = 9.81, m = st.mass;
+  const grip = st.latG * (off ? 0.55 : 1) * (hb ? 0.45 : 1);
+  let F = 0;
+  if (gas) F += Math.min(st.mu * m * g * 0.55, 230000 / Math.max(Math.abs(sim.v), 2));
+  if (brake) F -= sim.v > 0.5 ? st.mu * m * g * 0.95 : 0.35 * m * g;
+  F -= Math.sign(sim.v) * (0.5 * 1.2 * st.cd * st.area * sim.v * sim.v + (0.015 + (off ? 0.14 : 0)) * m * g);
+  if (hb) F -= Math.sign(sim.v) * 0.4 * m * g;
+  sim.v += (F / m) * dt;
+  if (!gas && !brake && Math.abs(sim.v) < 0.3) sim.v = 0;
+  // yaw: kinematic bicycle, capped by grip; heading may outrun velocity (slide)
+  const want = (sim.v * Math.tan(sim.steer)) / st.wb;
+  const cap = (grip * g) / Math.max(Math.abs(sim.v), 1.5);
+  const yaw = clamp(want, -cap * 1.35, cap * 1.35) * (1 + (hb ? 0.6 : 0));
+  sim.psi += yaw * dt;
+  let diff = Math.atan2(Math.sin(sim.psi - sim.theta), Math.cos(sim.psi - sim.theta));
+  if (sim.v < 0) { diff = 0; sim.theta = sim.psi; }
+  const turn = clamp(diff * 9, -cap, cap) * dt;
+  sim.theta += turn;
+  sim.v *= 1 - Math.min(0.9, Math.abs(Math.sin(diff)) * 0.9 * dt);
+  sim.x += Math.cos(sim.theta) * sim.v * dt; sim.z -= Math.sin(sim.theta) * sim.v * dt;
+  if (bi > track.N * 0.45 && bi < track.N * 0.55) sim.half = true;
+  if (sim.half && prev > track.N * 0.9 && bi < track.N * 0.1) {
+    const t = (nowMs() - sim.lapStart) / 1000;
+    sim.best = sim.best == null ? t : Math.min(sim.best, t);
+    bestLaps.push({ name: design.name, t }); bestLaps.sort((a, b) => a.t - b.t); renderBestLaps();
+    sim.lap++; sim.lapStart = nowMs(); sim.half = false;
+  }
+  car.position.set(sim.x, 0, sim.z);
+  const lean = clamp((((turn / dt) * sim.v) / g / st.rollG) * 0.08, -0.06, 0.06);
+  car.rotation.set(lean, sim.psi, 0, "YXZ"); // yaw, then body roll about the car's own length
+  for (const w of car.userData.wheels) {
+    w.spin.rotation.z -= (sim.v / (p.wheelDiameter / 2)) * dt;
+    if (w.front) w.pivot.rotation.y = sim.steer;
+  }
+  const fx = Math.cos(sim.psi), fz = -Math.sin(sim.psi);
+  const camT = new THREE.Vector3(sim.x - fx * (p.length + 4.5), 2.2 + p.height * 0.7, sim.z - fz * (p.length + 4.5));
+  camera.position.lerp(camT, 1 - Math.exp(-dt * 4));
+  camera.lookAt(sim.x + fx * 3, 0.9, sim.z + fz * 3);
+  sun.position.set(sim.x + 20, 40, sim.z + 15); sun.target.position.set(sim.x, 0, sim.z);
+  $("#hudSpeed").textContent = Math.round(Math.abs(sim.v) * 3.6);
+  $("#hudLap").textContent = `Lap ${sim.lap}`;
+  $("#hudTime").textContent = fmtLap((nowMs() - sim.lapStart) / 1000);
+  $("#hudBest").textContent = `Best ${sim.best == null ? "–" : fmtLap(sim.best)}`;
+}
+const fmtLap = (t) => `${Math.floor(t / 60)}:${(t % 60).toFixed(2).padStart(5, "0")}`;
+function renderBestLaps() {
+  const el = $("#bestLaps");
+  if (!bestLaps.length) { el.textContent = "No laps yet."; return; }
+  el.replaceChildren(...bestLaps.slice(0, 5).map((l, i) => { const d = document.createElement("div"); d.textContent = `${i + 1}. ${fmtLap(l.t)} · ${l.name}`; d.className = "val"; return d; }));
+}
+
+const KEYMAP = { KeyW: "gas", ArrowUp: "gas", KeyS: "brake", ArrowDown: "brake", KeyA: "left", ArrowLeft: "left", KeyD: "right", ArrowRight: "right", Space: "hand" };
+const typing = (e) => /^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName) && e.target.type !== "range" && e.target.type !== "checkbox";
+addEventListener("keydown", (e) => {
+  if (mode === "drive") {
+    if (e.code === "Escape") { exitDrive(); return; }
+    if (e.code === "KeyR") { placeOnTrack(false); return; }
+    const k = KEYMAP[e.code]; if (k) { keys.add(k); e.preventDefault(); }
+    return;
+  }
+  if (typing(e)) return;
+  const mod = e.ctrlKey || e.metaKey;
+  if (mod && e.code === "KeyZ") { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if (mod && e.code === "KeyY") { e.preventDefault(); redo(); return; }
+  if (toolActive() && (e.code === "Delete" || e.code === "Backspace")) {
+    if (tool === "parts" && selPart) { e.preventDefault(); removeSelectedPart(); }
+    else if (tool === "handles" && selHandle) { e.preventDefault(); deleteHandle(); }
+  }
+  if (e.code === "Escape" && (selPart || selHandle)) { selPart = null; selHandle = null; updateBuildUI(); refreshOverlay(); }
+});
+addEventListener("keyup", (e) => { const k = KEYMAP[e.code]; if (k) keys.delete(k); });
+addEventListener("blur", () => keys.clear());
+document.querySelectorAll(".touch button").forEach((b) => {
+  const k = b.dataset.k;
+  b.addEventListener("pointerdown", (e) => { e.preventDefault(); keys.add(k); b.setPointerCapture?.(e.pointerId); });
+  for (const ev of ["pointerup", "pointercancel", "pointerleave"]) b.addEventListener(ev, () => keys.delete(k));
+});
+
+// -------------------------------------------------------------- render loop
+let spin = false, last = nowMs();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (mode === "drive" && car) stepDrive(dt);
+  else {
+    if (spin && car && !stroke && !drag) car.rotation.y += dt * 0.35;
+    sculptTick(dt);
+    controls.update();
+  }
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+
+// ----------------------------------------------------------------------- UI
+function fmt(def, v) {
+  if (def.u === "mm") return `${Math.round(v * 1000).toLocaleString("en-US")} mm`;
+  if (def.u === "deg") return `${Math.round(v)}°`;
+  if (def.u === "%") return `${Math.round(v * 100)}%`;
+  if (def.u === "bias") return Math.abs(v) < 0.005 ? "centred" : `${v > 0 ? "back" : "fwd"} ${Math.abs(Math.round(v * 100))}`;
+  return v.toFixed(1);
+}
+function buildSliders() {
+  const host = $("#sliders");
+  const groups = [...new Set(PARAMS.map((p) => p.g))];
+  for (const gname of groups) {
+    const det = document.createElement("details"); det.className = "group"; det.open = gname === "Proportions" || gname === "Profile";
+    const sum = document.createElement("summary"); sum.textContent = gname; det.append(sum);
+    const rows = document.createElement("div"); rows.className = "rows";
+    for (const def of PARAMS.filter((p) => p.g === gname)) {
+      const row = document.createElement("div"); row.className = "row";
+      const lab = document.createElement("label"); lab.textContent = def.label;
+      if (def.e) {
+        const seg = document.createElement("div"); seg.className = "seg"; seg.dataset.k = def.k; seg.setAttribute("role", "group"); seg.setAttribute("aria-label", def.label);
+        for (const [id, name] of def.e) {
+          const b = document.createElement("button"); b.type = "button"; b.textContent = name; b.dataset.v = id;
+          b.addEventListener("click", () => { design.params[def.k] = id; changed(false); pushHistory(); });
+          seg.append(b);
+        }
+        row.append(lab, seg);
+      } else {
+        const inp = document.createElement("input"); inp.type = "range"; inp.id = `p-${def.k}`; inp.min = def.min; inp.max = def.max; inp.step = def.step;
+        lab.htmlFor = inp.id;
+        const out = document.createElement("output"); out.id = `o-${def.k}`;
+        inp.addEventListener("input", () => { design.params[def.k] = parseFloat(inp.value); changed(true); });
+        inp.addEventListener("change", pushHistory);
+        row.append(lab, out, inp);
+      }
+      rows.append(row);
+    }
+    det.append(rows); host.append(det);
+  }
+}
+function segSet(sel, cur) { document.querySelectorAll(`${sel} button`).forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === String(cur)))); }
+function makeSeg(sel, items, get, set) {
+  const host = $(sel);
+  for (const [id, name] of items) { const b = document.createElement("button"); b.type = "button"; b.dataset.v = id; b.textContent = name; b.addEventListener("click", () => set(id)); host.append(b); }
+  segSet(sel, get());
+}
+function syncUI() {
+  for (const def of PARAMS) {
+    if (def.e) segSet(`.seg[data-k="${def.k}"]`, design.params[def.k]);
+    else { $(`#p-${def.k}`).value = design.params[def.k]; $(`#o-${def.k}`).textContent = fmt(def, design.params[def.k]); }
+  }
+  $("#carName").value = design.name;
+  const pt = design.paint;
+  $("#paintColor").value = pt.color; $("#paintHex").textContent = pt.color.toUpperCase();
+  document.querySelectorAll(".swatch").forEach((s) => s.setAttribute("aria-pressed", String(s.dataset.c === pt.color)));
+  segSet("#finishSeg", pt.finish); segSet("#stripeSeg", pt.stripes);
+  $("#stripeColor").value = pt.stripeColor; $("#raceNumber").value = pt.number;
+  $("#tint").value = pt.tint; $("#tintOut").textContent = `${Math.round(pt.tint * 100)}%`;
+  $("#rimColor").value = pt.rim;
+  $("#pAuto").checked = design.params.details === "none";
+  updateBuildUI();
+}
+function changed(fast = true) { syncUI(); queueRebuild(fast); }
+function statTiles(host, items) {
+  host.replaceChildren(...items.map(([k, v]) => { const d = document.createElement("div"); const s = document.createElement("span"); s.textContent = k; const b = document.createElement("b"); b.textContent = v; d.append(s, b); return d; }));
+}
+function updateReadouts() {
+  const p = design.params, body = car.userData.body, pf = performance(design, body);
+  statTiles($("#stats"), [["Drag (Cd)", pf.cd.toFixed(2)], ["Frontal area", `${pf.area.toFixed(2)} m²`], ["Top speed", `${Math.round(pf.vmax * 3.6)} km/h`], ["0–100 km/h", `${pf.t100.toFixed(1)} s`], ["Cornering", `${pf.latG.toFixed(2)} g`], ["Est. mass", `${Math.round(pf.mass).toLocaleString("en-US")} kg`]]);
+  statTiles($("#driveStats"), [["Top speed", `${Math.round(pf.vmax * 3.6)} km/h`], ["0–100 km/h", `${pf.t100.toFixed(1)} s`], ["Grip limit", `${pf.latG.toFixed(2)} g`], ["Rollover at", `${pf.rollG.toFixed(2)} g`]]);
+  const mm = (v) => Math.round(v * 1000).toLocaleString("en-US");
+  const spec = $("#spec"); spec.replaceChildren();
+  for (const [k, v] of [["L", mm(p.length)], ["W", mm(Math.max(pf.W, p.width))], ["H", mm(pf.H)], ["WB", mm(body.lay.wb)], ["Cd", pf.cd.toFixed(2)], ["Parts", String(design.edits.parts.length)]]) { const s = document.createElement("span"); const b = document.createElement("b"); b.textContent = k; s.append(b, ` ${v}`); spec.append(s); }
+  $("#badgeName").textContent = design.name;
+  $("#shareCode").value = shareCode(design);
+  if (!$("#pubName").value || $("#pubName").dataset.auto === "1") { $("#pubName").value = design.name; $("#pubName").dataset.auto = "1"; }
+}
+
+// tween numeric params toward a target design (presets, AI)
+let tweenId = 0;
+function applyDesign(next, { animate = true, keepEdits = false } = {}) {
+  next = sanitize(next);
+  if (keepEdits) next.edits = design.edits;
+  const from = { ...design.params };
+  const id = ++tweenId;
+  design = { ...next, params: { ...design.params } };
+  for (const def of PARAMS) if (def.e) design.params[def.k] = next.params[def.k];
+  selPart = null; selHandle = null;
+  const done = () => { pushHistory(); };
+  if (!animate || matchMedia("(prefers-reduced-motion: reduce)").matches) { design.params = next.params; changed(false); done(); return; }
+  const t0 = nowMs(), dur = 650;
+  const step = (now) => {
+    if (id !== tweenId) return;
+    const t = smooth(0, 1, (now - t0) / dur);
+    for (const def of PARAMS) if (!def.e) design.params[def.k] = lerp(from[def.k], next.params[def.k], t);
+    changed(t < 1);
+    if (t < 1) requestAnimationFrame(step); else done();
+  };
+  requestAnimationFrame(step);
+}
+
+const TOOLS = [["handles", "Handles"], ["sculpt", "Sculpt"], ["paint", "Paint on"], ["parts", "Parts"]];
+const TOOL_HELP = {
+  handles: "Drag the dots to reshape the car: blue sets the roofline, purple the width, amber the underside. Click a line to add a dot. Drag empty space to turn the view.",
+  sculpt: "Drag on the body to sculpt it like clay. Hold still to build up. Drag empty space to turn the view.",
+  paint: "Paint straight onto the body: draw your own windows, lights, chrome or trim. Drag empty space to turn the view.",
+  parts: "Drag parts from the bin onto the car. Drag a part on the car to slide it along the body. Delete removes the selected part.",
+};
+function setTool(t) {
+  tool = t; selHandle = null; stroke = null; drag = null;
+  segSet("#toolSeg", t);
+  document.querySelectorAll("[data-toolpane]").forEach((el) => (el.hidden = el.dataset.toolpane !== t));
+  $("#toolHelp").textContent = TOOL_HELP[t];
+  renderer.domElement.style.cursor = t === "sculpt" || t === "paint" ? "crosshair" : "";
+  updateBuildUI(); refreshOverlay(); updateHint();
+}
+function updateHint() {
+  const h = $("#hint");
+  if (!toolActive()) { h.hidden = true; return; }
+  h.hidden = false;
+  h.textContent = { handles: "Handles: drag a dot · click a line to add one", sculpt: `Sculpt · ${brush.mode}: drag on the body`, paint: `Paint on · ${SKIN[brush.mat].label}: drag on the body`, parts: "Parts: drag from the bin onto the car" }[tool];
+}
+const PE = [["peLift", "lift", (v) => `${Math.round(v * 1000)} mm`], ["peSize", "size", (v) => `${v.toFixed(2)}×`], ["peSx", "sx", (v) => `${v.toFixed(2)}×`], ["peSy", "sy", (v) => `${v.toFixed(2)}×`], ["peSz", "sz", (v) => `${v.toFixed(2)}×`], ["peYaw", "yaw", (v) => `${Math.round(v)}°`], ["peTilt", "tilt", (v) => `${Math.round(v)}°`], ["peRoll", "roll", (v) => `${Math.round(v)}°`]];
+function updateBuildUI() {
+  const del = $("#hDelete");
+  del.disabled = !(selHandle && selHandle.k > 0 && selHandle.k < design.edits[selHandle.set].length - 1);
+  const part = design.edits.parts.find((p) => p.id === selPart);
+  $("#partEditor").hidden = !part;
+  if (part) {
+    $("#peName").textContent = PART_TYPES[part.type].label;
+    $("#peCount").textContent = part.mirror ? "pair" : "single";
+    for (const [id, key, f] of PE) { $(`#${id}`).value = part[key]; $(`#${id}Out`).textContent = f(part[key]); }
+    $("#peAlign").checked = part.align; $("#peMirror").checked = part.mirror;
+    segSet("#peMat", part.mat); $("#peColor").value = part.color; $("#peColorRow").hidden = part.mat !== "custom";
+  }
+}
+function deleteHandle() {
+  const { set, k } = selHandle || {};
+  const pts = design.edits[set];
+  if (!pts || k <= 0 || k >= pts.length - 1) return;
+  pts.splice(k, 1); selHandle = null; rebuild(false); updateBuildUI(); pushHistory();
+}
+function removeSelectedPart() {
+  design.edits.parts = design.edits.parts.filter((p) => p.id !== selPart); selPart = null;
+  buildParts(car, design); updateReadouts(); updateBuildUI(); refreshOverlay(); pushHistory();
+}
+
+function wireUI() {
+  buildSliders();
+  const pre = $("#presets");
+  PRESETS.forEach((pr, i) => {
+    const b = document.createElement("button"); b.className = `chip${pr.clay ? " clay" : ""}`; b.type = "button"; b.textContent = pr.name;
+    b.addEventListener("click", () => { applyDesign(PRESET_DESIGN(i)); if (pr.clay) { showTab("build"); setTool("sculpt"); } });
+    pre.append(b);
+  });
+  $("#carName").addEventListener("input", (e) => { design.name = e.target.value.slice(0, 40) || "Untitled"; $("#badgeName").textContent = design.name; if ($("#pubName").dataset.auto === "1") $("#pubName").value = design.name; $("#shareCode").value = shareCode(design); commitSoon(); });
+  const sw = $("#swatches");
+  for (const c of SWATCHES) { const b = document.createElement("button"); b.className = "swatch"; b.type = "button"; b.style.background = c; b.dataset.c = c; b.setAttribute("aria-label", `Paint ${c}`); b.addEventListener("click", () => { design.paint.color = c; paintChanged(); pushHistory(); }); sw.append(b); }
+  const paintChanged = () => { syncUI(); queueRebuild(false); };
+  $("#paintColor").addEventListener("input", (e) => { design.paint.color = e.target.value; paintChanged(); });
+  $("#paintColor").addEventListener("change", pushHistory);
+  makeSeg("#finishSeg", FINISHES, () => design.paint.finish, (v) => { design.paint.finish = v; paintChanged(); pushHistory(); });
+  makeSeg("#stripeSeg", STRIPES, () => design.paint.stripes, (v) => { design.paint.stripes = v; paintChanged(); pushHistory(); });
+  $("#stripeColor").addEventListener("input", (e) => { design.paint.stripeColor = e.target.value; paintChanged(); });
+  $("#stripeColor").addEventListener("change", pushHistory);
+  $("#raceNumber").addEventListener("input", (e) => { design.paint.number = e.target.value.replace(/[^0-9A-Za-z]/g, "").slice(0, 3); paintChanged(); commitSoon(); });
+  $("#tint").addEventListener("input", (e) => { design.paint.tint = parseFloat(e.target.value); paintChanged(); });
+  $("#tint").addEventListener("change", pushHistory);
+  $("#rimColor").addEventListener("input", (e) => { design.paint.rim = e.target.value; paintChanged(); });
+  $("#rimColor").addEventListener("change", pushHistory);
+
+  // build tools
+  makeSeg("#toolSeg", TOOLS, () => tool, setTool);
+  for (const [id, key] of [["hTop", "top"], ["hWidth", "width"], ["hBottom", "bottom"]]) $(`#${id}`).addEventListener("change", (e) => { show[key] = e.target.checked; refreshOverlay(); });
+  $("#hDelete").addEventListener("click", deleteHandle);
+  $("#hReset").addEventListener("click", () => { const b = blankEdits(); design.edits.top = b.top; design.edits.bottom = b.bottom; design.edits.width = b.width; selHandle = null; rebuild(false); pushHistory(); });
+  makeSeg("#sculptMode", [["pull", "Pull"], ["push", "Push"], ["smooth", "Smooth"], ["erase", "Erase"]], () => brush.mode, (v) => { brush.mode = v; segSet("#sculptMode", v); updateHint(); });
+  const rng = (id, key, f) => { const el = $(`#${id}`), out = $(`#${id}Out`); el.value = brush[key]; out.textContent = f(brush[key]); el.addEventListener("input", () => { brush[key] = parseFloat(el.value); out.textContent = f(brush[key]); }); };
+  rng("sSize", "size", (v) => `${Math.round(v * 1000)} mm`);
+  rng("sStrength", "strength", (v) => `${Math.round(v * 100)}%`);
+  rng("pSize", "psize", (v) => `${Math.round(v * 1000)} mm`);
+  $("#sMirror").addEventListener("change", (e) => (brush.mirror = e.target.checked));
+  $("#pMirror").addEventListener("change", (e) => (brush.pmirror = e.target.checked));
+  $("#pAuto").addEventListener("change", (e) => { design.params.details = e.target.checked ? "none" : "auto"; changed(false); pushHistory(); });
+  $("#sClear").addEventListener("click", () => { design.edits.sculpt = null; applySculpt(car.userData.body, null); placeAllParts(car, design); pushHistory(); });
+  makeSeg("#skinMat", SKIN_ORDER.map((c) => [String(c), SKIN[c].label]), () => String(brush.mat), (v) => { brush.mat = parseInt(v, 10); segSet("#skinMat", v); updateHint(); });
+  $("#pClear").addEventListener("click", () => { design.edits.skin = null; redrawLivery(); pushHistory(); });
+  const bin = $("#bin");
+  for (const [type, t] of Object.entries(PART_TYPES)) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "tile"; b.setAttribute("aria-label", `Add ${t.label}`);
+    b.innerHTML = `<svg viewBox="0 0 34 22" aria-hidden="true"><path d="${t.icon}"/></svg>`;
+    b.append(t.label);
+    b.addEventListener("pointerdown", (e) => binStart(e, type));
+    b.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); binDrag = { type, moved: false }; binUp(); } });
+    bin.append(b);
+  }
+  const editPart = (fn, rebuildMesh = false) => { const part = design.edits.parts.find((p) => p.id === selPart); if (!part) return; fn(part); if (rebuildMesh) buildParts(car, design); else placeAllParts(car, design); updateBuildUI(); refreshOverlay(); };
+  for (const [id, key] of PE) {
+    $(`#${id}`).addEventListener("input", (e) => editPart((p) => (p[key] = parseFloat(e.target.value))));
+    $(`#${id}`).addEventListener("change", pushHistory);
+  }
+  $("#peAlign").addEventListener("change", (e) => { editPart((p) => (p.align = e.target.checked)); pushHistory(); });
+  $("#peMirror").addEventListener("change", (e) => { editPart((p) => (p.mirror = e.target.checked), true); updateReadouts(); pushHistory(); });
+  makeSeg("#peMat", PART_MATS, () => "", (v) => { editPart((p) => (p.mat = v), true); pushHistory(); });
+  $("#peColor").addEventListener("input", (e) => editPart((p) => (p.color = e.target.value), true));
+  $("#peColor").addEventListener("change", pushHistory);
+  $("#peDup").addEventListener("click", () => { const part = design.edits.parts.find((p) => p.id === selPart); if (!part) return; const c = { ...part, id: newPartId(), u: clamp(part.u + 0.04, 0, 1) }; design.edits.parts.push(c); selPart = c.id; buildParts(car, design); updateReadouts(); updateBuildUI(); refreshOverlay(); pushHistory(); });
+  $("#peDel").addEventListener("click", removeSelectedPart);
+  $("#clearEdits").addEventListener("click", (e) => {
+    const b = e.currentTarget;
+    if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = "Press again to clear everything"; setTimeout(() => { b.dataset.confirm = ""; b.textContent = "Clear all hand edits"; }, 4000); return; }
+    b.dataset.confirm = ""; b.textContent = "Clear all hand edits";
+    design.edits = blankEdits(); selPart = null; selHandle = null; rebuild(false); updateBuildUI(); pushHistory();
+  });
+
+  document.querySelectorAll("nav.tabs button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
+  $("#undoBtn").addEventListener("click", undo);
+  $("#redoBtn").addEventListener("click", redo);
+  makeSeg("#viewSeg", [["34", "3/4"], ["side", "Side"], ["top", "Top"], ["front", "Front"]], () => "", setView);
+  document.querySelectorAll("#viewSeg button").forEach((b) => b.classList.add("icon-btn"));
+  $("#spinBtn").addEventListener("click", (e) => { spin = !spin; e.currentTarget.setAttribute("aria-pressed", String(spin)); if (!spin && car) car.rotation.y = 0; });
+  $("#driveStart").addEventListener("click", enterDrive);
+  $("#driveExit").addEventListener("click", exitDrive);
+  makeSeg("#scaleSeg", [["43", "1:43"], ["24", "1:24"], ["18", "1:18"]], () => String(stlScale), (v) => { stlScale = parseInt(v, 10); segSet("#scaleSeg", v); });
+  $("#expPng").addEventListener("click", exportPng);
+  $("#expStl").addEventListener("click", exportStl);
+  $("#expGlb").addEventListener("click", exportGlb);
+  $("#expJson").addEventListener("click", () => saveFile(`${slug(design.name)}.json`, JSON.stringify(serialize(design), null, 1), "application/json", $("#codeStatus")));
+  $("#copyCode").addEventListener("click", async () => {
+    const st = $("#codeStatus");
+    try { await navigator.clipboard.writeText($("#shareCode").value); setStatus(st, "Code copied.", "ok"); }
+    catch { $("#shareCode").select(); setStatus(st, "Your browser blocked copying. The code is selected: press Ctrl+C or ⌘C."); }
+  });
+  $("#loadCode").addEventListener("click", () => {
+    const st = $("#codeStatus");
+    const d = parseCode($("#importCode").value);
+    if (!d) { setStatus(st, "That code is not a Coachbuilder design. Check that you pasted all of it, starting with CB2: or CB1:.", "err"); return; }
+    applyDesign(d); $("#importCode").value = ""; setStatus(st, `Loaded "${sanitize(d).name}".`, "ok");
+  });
+  $("#resetDesign").addEventListener("click", () => applyDesign({ name: "Untitled coupe" }));
+  $("#pubName").addEventListener("input", (e) => (e.target.dataset.auto = "0"));
+}
+function setView(v) {
+  const L = design.params.length, d = Math.max(7, L * 1.9);
+  const P = { "34": [6.2, 2.4, 6.8], side: [0, 0.8, d], top: [0, d * 1.05, 0.01], front: [d, 0.9, 0] }[v] || [6.2, 2.4, 6.8];
+  camera.position.set(...P); controls.target.set(0, 0.6, 0); controls.update();
+}
+function showTab(t) {
+  tab = t;
+  document.querySelectorAll("nav.tabs button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === t)));
+  document.querySelectorAll("[data-pane]").forEach((s) => (s.hidden = s.dataset.pane !== t));
+  if (t === "gallery") startGallery();
+  if (t !== "drive" && mode === "drive") exitDrive();
+  if (t === "build" && spin) $("#spinBtn").click();
+  refreshOverlay(); updateHint();
+}
+const setStatus = (el, msg, kind = "") => { el.textContent = msg; el.className = `status ${kind}`; };
+const slug = (s) => (s || "car").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "car";
+
+// --------------------------------------------------------------- share code
+function shareCode(d) { return "CB2:" + b64(new TextEncoder().encode(JSON.stringify(serialize(d)))); }
+function parseCode(s) {
+  try {
+    s = (s || "").trim();
+    if (s.startsWith("CB2:")) return JSON.parse(new TextDecoder().decode(unb64(s.slice(4))));
+    if (s.startsWith("CB1:")) { const o = JSON.parse(new TextDecoder().decode(unb64(s.slice(4)))); return { name: o.n, params: o.p, paint: o.c }; }
+    return null;
+  } catch { return null; }
+}
+
+// ------------------------------------------------------------------ exports
+let stlScale = 24;
+let downloads = null;
+const crcTable = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(u8) { let c = 0xffffffff; for (let i = 0; i < u8.length; i++) c = crcTable[(c ^ u8[i]) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; }
+function zipOne(name, data) { // single-file ZIP, stored (no compression)
+  const nm = new TextEncoder().encode(name), crc = crc32(data), n = data.length;
+  const now = new Date(), dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1), dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+  const lh = new DataView(new ArrayBuffer(30)); lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(10, dosTime, true); lh.setUint16(12, dosDate, true); lh.setUint32(14, crc, true); lh.setUint32(18, n, true); lh.setUint32(22, n, true); lh.setUint16(26, nm.length, true);
+  const cd = new DataView(new ArrayBuffer(46)); cd.setUint32(0, 0x02014b50, true); cd.setUint16(4, 20, true); cd.setUint16(6, 20, true); cd.setUint16(12, dosTime, true); cd.setUint16(14, dosDate, true); cd.setUint32(16, crc, true); cd.setUint32(20, n, true); cd.setUint32(24, n, true); cd.setUint16(28, nm.length, true);
+  const off = 30 + nm.length + n;
+  const end = new DataView(new ArrayBuffer(22)); end.setUint32(0, 0x06054b50, true); end.setUint16(8, 1, true); end.setUint16(10, 1, true); end.setUint32(12, 46 + nm.length, true); end.setUint32(16, off, true);
+  return new Blob([lh, nm, data, cd, nm, end], { type: "application/zip" });
+}
+async function saveFile(filename, data, mime, statusEl, zipInClaude = false) {
+  let blob = data instanceof Blob ? data : new Blob([data], { type: mime });
+  if (IN_CLAUDE) {
+    if (!downloads) { try { downloads = await window.claude.use("downloads"); } catch { downloads = null; } }
+    if (!downloads) { setStatus(statusEl, "Saving files is turned off in this view. Use the share code instead.", "err"); return; }
+    let name = filename;
+    if (zipInClaude) { blob = zipOne(filename, new Uint8Array(await blob.arrayBuffer())); name = filename.replace(/\.[^.]+$/, "") + ".zip"; }
+    try { await downloads.save({ filename: name, data: blob }); setStatus(statusEl, `Saved ${name}.`, "ok"); }
+    catch (e) { setStatus(statusEl, e?.code === "declined" ? "Save cancelled." : `The file was not saved (${e?.code || "error"}).`, e?.code === "declined" ? "" : "err"); }
+    return;
+  }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = filename; document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  setStatus(statusEl, `Saved ${filename}.`, "ok");
+}
+function exportPng() {
+  overlay.visible = false; renderer.render(scene, camera); overlay.visible = true;
+  renderer.domElement.toBlob((b) => saveFile(`${slug(design.name)}.png`, b, "image/png", $("#expStatus")), "image/png");
+}
+function stlBytes() {
+  const c = buildCar(design), k = 1000 / stlScale; // metres → millimetres at the chosen scale
+  const root = new THREE.Group(); root.add(c);
+  c.scale.setScalar(k); c.rotation.x = Math.PI / 2; // Y-up → Z-up for slicers
+  root.updateMatrixWorld(true);
+  const bin = new STLExporter().parse(root, { binary: true });
+  disposeCar(c);
+  return bin;
+}
+function glbBytes() {
+  const c = buildCar(design);
+  return new Promise((res, rej) => new GLTFExporter().parse(c, (glb) => { disposeCar(c); res(glb); }, (err) => { disposeCar(c); rej(err); }, { binary: true }));
+}
+function exportStl() { saveFile(`${slug(design.name)}-1to${stlScale}.stl`, stlBytes(), "model/stl", $("#expStatus"), true); }
+function exportGlb() { glbBytes().then((g) => saveFile(`${slug(design.name)}.glb`, g, "model/gltf-binary", $("#expStatus"), true), (err) => setStatus($("#expStatus"), `The GLB export failed: ${err?.message || err}`, "err")); }
+
+// -------------------------------------------------------------- thumbnails
+let thumbR = null, thumbScene = null, thumbCam = null;
+const thumbCache = new Map();
+function thumbnail(d) {
+  const key = JSON.stringify(serialize(d));
+  if (thumbCache.has(key)) return thumbCache.get(key);
+  if (!thumbR) {
+    thumbR = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+    thumbR.setSize(320, 200, false); thumbR.outputColorSpace = THREE.SRGBColorSpace; thumbR.toneMapping = THREE.ACESFilmicToneMapping;
+    thumbScene = new THREE.Scene(); thumbScene.environment = new THREE.PMREMGenerator(thumbR).fromScene(new RoomEnvironment(), 0.04).texture;
+    const l = new THREE.DirectionalLight(0xffffff, 1.4); l.position.set(4, 9, 5); thumbScene.add(l, new THREE.HemisphereLight(0xffffff, 0x8a8f8c, 0.5));
+    thumbCam = new THREE.PerspectiveCamera(30, 1.6, 0.1, 100);
+  }
+  const c = buildCar(d); thumbScene.add(c);
+  const dist = Math.max(8.5, d.params.length * 1.95);
+  thumbCam.position.set(dist * 0.62, 2.1, dist * 0.78); thumbCam.lookAt(0, 0.55, 0);
+  thumbR.render(thumbScene, thumbCam);
+  const url = thumbR.domElement.toDataURL("image/webp", 0.85);
+  thumbScene.remove(c); disposeCar(c);
+  thumbCache.set(key, url);
+  return url;
+}
+
+// ----------------------------------------------------------------- gallery
+let galleryStarted = false, db = null, user = null, myId = null, isOwner = false, canWrite = null;
+let galleryDocs = new Map(), likeDocs = new Map(), sortBy = "new";
+async function startGallery() {
+  if (galleryStarted) return; galleryStarted = true;
+  if (!IN_CLAUDE) { $("#galleryOff").hidden = false; return; }
+  $("#galleryOn").hidden = false;
+  makeSeg("#sortSeg", [["new", "Newest"], ["top", "Most liked"], ["mine", "Mine"]], () => sortBy, (v) => { sortBy = v; segSet("#sortSeg", v); renderGallery(); });
+  try { [db, user] = await Promise.all([window.claude.use("db"), window.claude.use("user").catch(() => null)]); } catch { db = null; }
+  if (!db) { $("#gallery").replaceChildren(emptyBox("The gallery is not available in this view. Sign in to Claude and allow this page to keep shared data, then reload.")); $("#publish").disabled = true; return; }
+  if (user) { try { myId = await user.id(); isOwner = await user.isOwner(); canWrite = await user.can("data.write"); } catch { myId = null; } }
+  if (canWrite === false) { $("#publish").disabled = true; setStatus($("#pubStatus"), "You can browse and load designs. Publishing and likes need Contributor access from the owner of this page."); }
+  db.collection("gallery").onSnapshot((snap) => { galleryDocs = new Map(snap.docs.map((d) => [d.id, d.data()])); renderGallery(); }, (e) => $("#gallery").replaceChildren(emptyBox(`The gallery stopped updating (${e.code}). Reload the page to reconnect.`)));
+  db.collection("likes").onSnapshot((snap) => {
+    if (likeWrites > 0) return; // our own write is in flight; its snapshot follows
+    likeDocs = new Map(snap.docs.map((d) => [d.id, d.data()])); myLikes = null; renderGallery();
+  }, () => {});
+  $("#publish").addEventListener("click", publishCar);
+}
+const emptyBox = (t) => { const d = document.createElement("div"); d.className = "empty"; d.textContent = t; return d; };
+function allCars() {
+  const out = [];
+  for (const [uid, doc] of galleryDocs) {
+    for (const c of Array.isArray(doc?.cars) ? doc.cars : []) {
+      if (!c || typeof c.id !== "string") continue;
+      out.push({ uid, id: c.id, key: `${uid}/${c.id}`, at: typeof c.at === "number" ? c.at : 0, design: sanitize(c.design) });
+    }
+  }
+  return out;
+}
+function likeCounts() {
+  const m = new Map();
+  for (const doc of likeDocs.values()) for (const k of Array.isArray(doc?.ids) ? doc.ids : []) if (typeof k === "string") m.set(k, (m.get(k) || 0) + 1);
+  return m;
+}
+let renderSeq = 0;
+async function renderGallery() {
+  const seq = ++renderSeq;
+  const host = $("#gallery");
+  let cars = allCars();
+  const counts = likeCounts();
+  const mine = new Set(Array.isArray(likeDocs.get(myId)?.ids) ? likeDocs.get(myId).ids : []);
+  if (sortBy === "mine") cars = cars.filter((c) => c.uid === myId);
+  cars.sort((a, b) => (sortBy === "top" ? (counts.get(b.key) || 0) - (counts.get(a.key) || 0) || b.at - a.at : b.at - a.at));
+  if (!cars.length) { host.replaceChildren(emptyBox(sortBy === "mine" ? "You have not published a design yet. Name it above and press Publish to gallery." : "No designs yet. Be the first: name your car above and press Publish to gallery.")); return; }
+  let names = {};
+  if (user) { try { names = await user.profiles([...new Set(cars.map((c) => c.uid))]); } catch {} }
+  if (seq !== renderSeq) return;
+  host.replaceChildren(...cars.map((c) => {
+    const card = document.createElement("article"); card.className = "card";
+    const img = document.createElement("img"); img.className = "thumb"; img.alt = `${c.design.name} rendering`; img.width = 320; img.height = 200;
+    const meta = document.createElement("div"); meta.className = "meta";
+    const b = document.createElement("b"); b.textContent = c.design.name;
+    const sp = document.createElement("span"); sp.textContent = `${c.uid === myId ? "You" : names[c.uid]?.name || "A designer"} · ♥ ${counts.get(c.key) || 0}`;
+    meta.append(b, sp);
+    const acts = document.createElement("div"); acts.className = "acts";
+    const load = document.createElement("button"); load.textContent = "Load"; load.addEventListener("click", () => { applyDesign(c.design); showTab("shape"); });
+    const like = document.createElement("button"); like.textContent = mine.has(c.key) ? "♥ Liked" : "♡ Like"; like.setAttribute("aria-pressed", String(mine.has(c.key)));
+    like.disabled = canWrite === false || !myId; like.addEventListener("click", () => toggleLike(c.key));
+    acts.append(load, like);
+    if (c.uid === myId || isOwner) { const del = document.createElement("button"); del.textContent = "Remove"; del.addEventListener("click", () => removeCar(c, del)); acts.append(del); }
+    card.append(img, meta, acts);
+    requestAnimationFrame(() => { img.src = thumbnail(c.design); });
+    return card;
+  }));
+}
+let writing = Promise.resolve();
+const serial = (fn) => (writing = writing.then(fn, fn));
+function publishCar() {
+  const st = $("#pubStatus");
+  if (!myId) { setStatus(st, "Sign in to Claude to publish.", "err"); return; }
+  const name = ($("#pubName").value || design.name).trim().slice(0, 40) || "Untitled";
+  const entry = { id: Math.random().toString(36).slice(2, 10), at: Date.now(), design: { ...serialize(design), name } };
+  $("#publish").disabled = true;
+  serial(async () => {
+    try {
+      const ref = db.doc(`gallery/${myId}`);
+      const cur = (await ref.get()).data();
+      let cars = [...(Array.isArray(cur?.cars) ? cur.cars : []), entry];
+      while (cars.length > 1 && (cars.length > 40 || JSON.stringify(cars).length > 230000)) cars = cars.slice(1); // stay under the 256 KB document limit
+      await ref.set({ cars, updated: Date.now() });
+      setStatus(st, `Published "${name}". Everyone with this page can see it now.`, "ok"); sortBy = "new"; segSet("#sortSeg", "new");
+    } catch (e) {
+      if (e?.code === "invalid_argument") { canWrite = false; setStatus(st, "This page does not let you publish. Ask its owner for Contributor access.", "err"); }
+      else setStatus(st, `Publishing failed (${e?.code || "error"}). Try again in a moment.`, "err");
+    } finally { $("#publish").disabled = canWrite === false; }
+  });
+}
+let myLikes = null, likeWrites = 0; // local copy of this viewer's likes, so quick taps don't overwrite each other
+function toggleLike(key) {
+  if (!myLikes) myLikes = new Set(Array.isArray(likeDocs.get(myId)?.ids) ? likeDocs.get(myId).ids : []);
+  myLikes.has(key) ? myLikes.delete(key) : myLikes.add(key);
+  const ids = [...myLikes].slice(-500);
+  likeWrites++;
+  likeDocs = new Map(likeDocs).set(myId, { ids }); renderGallery();
+  serial(async () => {
+    try { await db.doc(`likes/${myId}`).set({ ids }); }
+    catch (e) { setStatus($("#pubStatus"), `That like did not save (${e?.code || "error"}).`, "err"); myLikes = null; }
+    finally { likeWrites--; }
+  });
+}
+function removeCar(c, btn) {
+  if (btn.dataset.confirm !== "1") { btn.dataset.confirm = "1"; btn.textContent = "Confirm remove"; setTimeout(() => { btn.dataset.confirm = ""; btn.textContent = "Remove"; }, 4000); return; }
+  serial(async () => {
+    try {
+      const ref = db.doc(`gallery/${c.uid}`);
+      const cur = (await ref.get()).data();
+      const cars = (Array.isArray(cur?.cars) ? cur.cars : []).filter((x) => x?.id !== c.id);
+      await ref.set({ cars, updated: Date.now() });
+    } catch (e) { setStatus($("#pubStatus"), `Removing failed (${e?.code || "error"}).`, "err"); }
+  });
+}
+
+// --------------------------------------------------------------------- AI
+async function setupAI() {
+  if (!IN_CLAUDE) return;
+  let sample = null;
+  try { sample = await window.claude.use("sample"); } catch { sample = null; }
+  if (!sample) return;
+  $("#aiBox").hidden = false;
+  let ctl = null;
+  const st = $("#aiStatus");
+  const schema = PARAMS.map((d) => (d.e ? `- ${d.k}: one of ${d.e.map(([id]) => `"${id}"`).join(", ")} (${d.label})` : `- ${d.k}: number ${d.min}–${d.max}${d.u === "mm" ? " metres" : d.u === "deg" ? " degrees from vertical" : d.u === "%" ? " (fraction)" : ""} (${d.label})`)).join("\n");
+  $("#aiGo").addEventListener("click", async () => {
+    const ask = $("#aiPrompt").value.trim();
+    if (!ask) { setStatus(st, "Type a short description first, for example: a boxy 80s rally hatchback in white.", "err"); return; }
+    ctl = new AbortController();
+    $("#aiGo").disabled = true; $("#aiStop").hidden = false; setStatus(st, "Sketching your car…");
+    const prompt = `You are the design engine of a parametric car modeller. Turn the request into parameter values.
+Request: """${ask}"""
+
+Parameters (real-world scale; heights from the ground):
+${schema}
+
+Paint fields: color (hex like "#1f4e8c"), finish ("gloss"|"metallic"|"matte"|"chrome"|"clay"), stripes ("none"|"twin"|"single"|"side"|"twotone"), stripeColor (hex), number (0-3 characters, empty string for none), tint (0–1 window tint), rim (hex).
+
+Guidance: wheelbase must be shorter than length minus about 0.9 m. A wedge supercar has a low nose (~0.45), steep rake (~68), short roof, fastback, wide body. Trucks are tall with high noses and rearStyle "pickup". Vintage cars have narrow tires and dish or steelie wheels. Keep details "auto" unless the request asks for a bare body.
+
+Current design for reference: ${JSON.stringify({ params: design.params, paint: design.paint })}
+
+Reply with only a JSON object: {"name": "<short evocative model name>", "params": {...all parameter keys...}, "paint": {...all paint fields...}, "note": "<one sentence about the design choices>"}`;
+    try {
+      const out = await sample.json(prompt, { signal: ctl.signal, onText: () => setStatus(st, "Shaping the body…") });
+      if (!out || typeof out !== "object") throw { code: "invalid_json" };
+      applyDesign({ name: out.name, params: { ...design.params, ...out.params }, paint: { ...design.paint, ...out.paint } }, { keepEdits: true });
+      setStatus(st, typeof out.note === "string" ? out.note.slice(0, 220) : "Done. Refine it with the sliders or in Build.", "ok");
+      $("#aiGo").disabled = false;
+    } catch (e) {
+      const m = { cancelled: "", not_granted: "Claude access was declined for this page, so the describe box is off for now.", rate_limited: "You have hit your Claude usage limit for now. Try again later.", invalid_json: "Claude's answer was not a usable design. Try rephrasing, then press Design it again." };
+      setStatus(st, m[e?.code] ?? `That did not work (${e?.code || "error"}). Press Design it to try again.`, e?.code === "cancelled" ? "" : "err");
+      $("#aiGo").disabled = e?.code === "not_granted";
+    }
+    $("#aiStop").hidden = true; ctl = null;
+  });
+  $("#aiStop").addEventListener("click", () => ctl?.abort());
+}
+
+// ------------------------------------------------------------------- boot
+if (!IN_CLAUDE) { $("#envNote").textContent = "standalone"; $("#expNote").textContent = "Exports download straight to your device. AI design and the shared gallery need the Claude artifact version."; }
+wireUI();
+setTool("handles");
+syncUI();
+resize();
+rebuild(false);
+pushHistory();
+setupAI();
+requestAnimationFrame(frame);
+
+// test hooks (harmless in normal use)
+window.__coachbuilder = {
+  get design() { return design; }, applyDesign, scene, camera, overlay, renderer, setView, keys, sim, PRESETS, PRESET_DESIGN, shareCode, parseCode, serialize, sanitize,
+  stepDrive: (dt) => stepDrive(dt), enterDrive, exitDrive, get carObj() { return car; }, stlBytes, glbBytes, showTab, setTool, undo, redo, get hist() { return hist; },
+  sculptAt(u, v, secs = 1, mode = "pull") { brush.mode = mode; for (let i = 0; i < secs * 30; i++) stampSculpt(u, v, 1 / 30); applySculpt(car.userData.body, design.edits.sculpt); placeAllParts(car, design); pushHistory(); },
+  paintAt(u, v, mat = 1, size = 0.1) { brush.mat = mat; brush.psize = size; stampPaint(u, v); redrawLivery(); pushHistory(); },
+  addPart(type, u, v) { const p = newPart(type, u, v); design.edits.parts.push(p); buildParts(car, design); pushHistory(); return p.id; },
+  moveHandle(set, k, d) { design.edits[set][k][1] = d; rebuild(false); pushHistory(); },
+};
+</script>
