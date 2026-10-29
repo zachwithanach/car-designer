@@ -67,7 +67,12 @@ aside.panel { background: var(--panel); border-right: 1px solid var(--line); ove
 .stage { position: relative; min-height: 0; min-width: 0; background: linear-gradient(180deg, var(--stage-top), var(--stage-bottom)); overflow: hidden; }
 .stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 
+@media (pointer: coarse) {
+  .track { touch-action: pan-y pinch-zoom; padding-block: 4px; }
+  .track > input[type="range"] { pointer-events: none; } /* moved by a sideways drag on its strip, see slide handling */
+}
 @media (max-width: 820px) {
+  html { scroll-padding-top: calc(56vh + 16px); }
   .app { height: auto; min-height: 100%; }
   main.work { grid-template-columns: 1fr; grid-template-rows: 56vh auto; }
   .stage { order: -1; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 2; }
@@ -88,7 +93,8 @@ details.group[open] > summary::after { content: "–"; }
 .row { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; }
 .row label { font-size: 13px; font-weight: 500; }
 .row output, .val { font-family: var(--font-data); font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
-.row input[type="range"] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); margin: 2px 0 0; }
+.row .track { grid-column: 1 / -1; }
+.row input[type="range"] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); margin: 2px 0 0; display: block; }
 .seg { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px; }
 .seg button { flex: 1 1 auto; border: 1px solid var(--line); background: transparent; border-radius: var(--r); padding: 6px 8px; font-size: 12px; cursor: pointer; }
 .seg button[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--panel); }
@@ -155,6 +161,7 @@ textarea { resize: vertical; min-height: 64px; }
 .icon-btn:disabled { opacity: 0.4; cursor: default; }
 .badge-name { position: absolute; top: 12px; left: max(14px, env(safe-area-inset-left, 0px)); font-family: var(--font-display); font-stretch: 125%; font-weight: 800; font-size: clamp(18px, 3vw, 30px); letter-spacing: 0.02em; text-transform: uppercase; color: var(--ink); opacity: 0.85; pointer-events: none; max-width: 36%; text-wrap: balance; line-height: 1.05; overflow-wrap: anywhere; }
 @media (max-width: 820px) { .hint { display: none; } }
+.toast { position: absolute; left: 50%; top: 54px; transform: translateX(-50%); max-width: calc(100% - 32px); background: var(--ink); color: var(--panel); border-radius: var(--r); padding: 8px 12px; font-size: 13px; font-weight: 500; z-index: 3; pointer-events: none; text-align: center; }
 .hint { position: absolute; left: max(14px, env(safe-area-inset-left, 0px)); bottom: 38px; max-width: min(420px, 80%); background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 6px 10px; font-size: 12px; color: var(--ink-2); pointer-events: none; }
 
 /* drive HUD */
@@ -269,6 +276,7 @@ kbd { font-family: var(--font-data); font-size: 11px; border: 1px solid var(--li
           <div class="sheet" data-toolpane="parts" hidden>
             <p class="note">Drag a part onto the car, or tap it to add it in a sensible spot.</p>
             <div class="bin" id="bin"></div>
+            <p class="status" id="partStatus" aria-live="polite"></p>
             <div class="editor" id="partEditor" hidden>
               <h3><span id="peName">Part</span><span class="val" id="peCount"></span></h3>
               <div class="grid2">
@@ -387,6 +395,7 @@ kbd { font-family: var(--font-data); font-size: 11px; border: 1px solid var(--li
         <button class="icon-btn" id="spinBtn" aria-pressed="false">Spin</button>
       </div>
       <div class="hint" id="hint" hidden></div>
+      <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
       <div class="spec" id="spec"></div>
       <div class="hud" id="hud" hidden>
         <div class="laps"><span id="hudLap">Lap 1</span><span id="hudTime">0:00.00</span><span id="hudBest">Best –</span></div>
@@ -523,6 +532,7 @@ const PART_TYPES = {
   sphere: { label: "Dome", align: true, mirror: false, mat: "body", u: 0.5, v: 0.5, icon: "M4 19a13 13 0 0 1 26 0z" },
   cylinder: { label: "Tube", align: true, mirror: false, mat: "body", u: 0.5, v: 0.5, icon: "M10 5h14v14H10zM10 5a7 2 0 0 0 14 0" },
 };
+const MAX_PARTS = 60;
 let partSeq = 0;
 const newPartId = () => `p${Date.now().toString(36)}${(partSeq++).toString(36)}`;
 function newPart(type, u, v) {
@@ -610,11 +620,14 @@ function sanitize(d) {
       else if (typeof e.skin === "string") out.edits.skin = rleDec(e.skin, PGU * PGV).map((x) => (x <= 8 ? x : 0));
     } catch { out.edits.skin = null; }
     if (Array.isArray(e.parts)) {
-      for (const r of e.parts.slice(0, 60)) {
-        if (!r || !PART_TYPES[r.type]) continue;
+      const ids = new Set();
+      for (const r of e.parts.slice(0, MAX_PARTS)) {
+        if (!r || typeof r.type !== "string" || !Object.hasOwn(PART_TYPES, r.type)) continue;
+        const id = typeof r.id === "string" && /^[A-Za-z0-9_-]{1,24}$/.test(r.id) && !ids.has(r.id) ? r.id : newPartId();
+        ids.add(id);
         const n = (v, a, b, def) => (typeof v === "number" && isFinite(v) ? clamp(v, a, b) : def);
         out.edits.parts.push({
-          id: typeof r.id === "string" ? r.id.slice(0, 24) : newPartId(), type: r.type,
+          id, type: r.type,
           u: n(r.u, 0, 1, 0.5), v: n(r.v, 0, 1, 0.5), lift: n(r.lift, -0.3, 0.9, 0),
           yaw: n(r.yaw, -180, 180, 0), tilt: n(r.tilt, -90, 90, 0), roll: n(r.roll, -90, 90, 0),
           size: n(r.size, 0.1, 4, 1), sx: n(r.sx, 0.1, 6, 1), sy: n(r.sy, 0.1, 6, 1), sz: n(r.sz, 0.1, 6, 1),
@@ -865,6 +878,7 @@ function buildBody(p, e) {
   const doorS = lay.sF + lay.wb * 0.48;
   const doorI = Math.round((doorS / L) * (NS - 1));
   const body = {
+    maskKey: JSON.stringify([p, e.top, e.bottom, e.width]),
     geo, lay, S, ZT, ZB, HW, FL, ZT0, ZB0, HW0, CAB, zWheel, surfX, halfAt, at, atT, isGlass, basePos, nrm, well, perS, cols,
     per: perS[doorI], doorS, vDoor: vAtY(doorI, rh + (beltH - rh) * 0.52), vSide: vAtY(doorI, beltH - 0.1), vBelt: vAtY(doorI, beltH),
     W: 2 * Math.max(...HW.map((h, i) => h + FL[i])), H: Math.max(...ZT),
@@ -910,15 +924,34 @@ function surfaceAt(body, u, v) { // point + normal on the final (sculpted) surfa
 // --------------------------------------------------------------- materials
 function glassColor(tint) { const l = lerp(0.42, 0.035, tint); const h = (x) => Math.round(clamp(x, 0, 1) * 255).toString(16).padStart(2, "0"); return `#${h(l * 0.82)}${h(l * 0.92)}${h(l)}`; }
 const hexRgb = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
-const GM_W = 1024, GM_H = 512;
-function glassMask(body) { // cached boolean mask of the automatic windows
+const GM_W = 1024, GM_H = 1024;
+const maskCache = new Map(); // window masks depend only on the shape (params + handle curves), not on paint or sculpt
+function glassMask(body) { // cached window coverage (0-255), antialiased by supersampling only the edge pixels
   if (body._mask) return body._mask;
-  const w = GM_W, h = GM_H, m = new Uint8Array(w * h), L = body.lay.L;
+  if (maskCache.has(body.maskKey)) return (body._mask = maskCache.get(body.maskKey));
+  const w = GM_W, h = GM_H, L = body.lay.L, m = new Uint8Array(w * h);
+  const at = (x, y) => body.isGlass((x / w) * L, -Math.PI / 2 + 2 * Math.PI * (1 - y / h));
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (at(x + 0.5, y + 0.5)) m[y * w + x] = 255;
+  const out = m.slice();
   for (let y = 0; y < h; y++) {
-    const ph = -Math.PI / 2 + 2 * Math.PI * (1 - (y + 0.5) / h);
-    for (let x = 0; x < w; x++) if (body.isGlass(((x + 0.5) / w) * L, ph)) m[y * w + x] = 1;
+    for (let x = 0; x < w; x++) {
+      const k = y * w + x, v = m[k];
+      if (!((x > 0 && m[k - 1] !== v) || (x < w - 1 && m[k + 1] !== v) || (y > 0 && m[k - w] !== v) || (y < h - 1 && m[k + w] !== v))) continue;
+      let c = 0;
+      for (let sy = 0; sy < 4; sy++) for (let sx = 0; sx < 4; sx++) if (at(x + (sx + 0.5) / 4, y + (sy + 0.5) / 4)) c++;
+      out[k] = Math.round((c * 255) / 16);
+    }
   }
-  return (body._mask = m);
+  maskCache.set(body.maskKey, out);
+  if (maskCache.size > 6) maskCache.delete(maskCache.keys().next().value);
+  return (body._mask = out);
+}
+function coverCanvas(cov, w, h, rgb) { // one color, alpha from coverage
+  const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+  const g = cv.getContext("2d"), img = g.createImageData(w, h);
+  for (let i = 0; i < cov.length; i++) { if (!cov[i]) continue; img.data[i * 4] = rgb[0]; img.data[i * 4 + 1] = rgb[1]; img.data[i * 4 + 2] = rgb[2]; img.data[i * 4 + 3] = cov[i]; }
+  g.putImageData(img, 0, 0);
+  return cv;
 }
 function maskCanvas(mask, w, h, colorOf) { // paint a code grid into a small canvas; colorOf(code) → [r,g,b] or null
   const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
@@ -977,13 +1010,13 @@ function drawLivery(liv, paint, body, skin) {
   const fin = FINISH_ORM[paint.finish] || FINISH_ORM.gloss;
   const ormOf = (code) => (SKIN[code].orm || fin).map((x) => Math.round(x * 255));
   g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
-  g.drawImage(maskCanvas(mask, GM_W, GM_H, () => glassRGB), 0, 0, cw, ch);
+  g.drawImage(coverCanvas(mask, GM_W, GM_H, glassRGB), 0, 0, cw, ch);
   if (skinR) g.drawImage(maskCanvas(skinR, PGU, PGV, (c) => hexRgb(SKIN[c].color(paint))), 0, 0, cw, ch);
   // clearcoat (R) / roughness (G) / metalness (B)
   const o = ov.getContext("2d");
   o.fillStyle = `rgb(${fin.map((x) => Math.round(x * 255)).join(",")})`; o.fillRect(0, 0, ov.width, ov.height);
   o.imageSmoothingEnabled = true;
-  o.drawImage(maskCanvas(mask, GM_W, GM_H, () => [255, 13, 0]), 0, 0, ov.width, ov.height);
+  o.drawImage(coverCanvas(mask, GM_W, GM_H, [255, 13, 0]), 0, 0, ov.width, ov.height);
   if (skinR) o.drawImage(maskCanvas(skinR, PGU, PGV, ormOf), 0, 0, ov.width, ov.height);
   // glow from brush-painted lamps
   const eg = ev.getContext("2d");
@@ -1096,7 +1129,7 @@ function buildWheel(p, mats, side) {
   for (let k = 0; k <= steps; k++) { const a = -Math.PI / 2 + (Math.PI * k) / steps; prof.push(new THREE.Vector2(R - 0.04 + Math.cos(a) * 0.04, (w / 2 - 0.04) * Math.sign(Math.sin(a)) + Math.sin(a) * 0.04)); }
   prof.push(new THREE.Vector2(rimR, w / 2 - 0.01), new THREE.Vector2(rimR, -w / 2 + 0.01));
   prof.push(prof[0].clone());
-  const tire = new THREE.Mesh(new THREE.LatheGeometry(prof.reverse(), 40), mats.tire);
+  const tire = new THREE.Mesh(new THREE.LatheGeometry(prof, 40), mats.tire);
   tire.rotation.x = Math.PI / 2; tire.castShadow = true; grp.add(tire);
   const face = side * (w / 2 - 0.02);
   const barrel = new THREE.Mesh(new THREE.CylinderGeometry(rimR, rimR, w - 0.03, 32), mats.rim);
@@ -1106,10 +1139,11 @@ function buildWheel(p, mats, side) {
   const hub = new THREE.Mesh(new THREE.CylinderGeometry(rimR * 0.2, rimR * 0.24, 0.05, 20), mats.rim);
   hub.rotation.x = Math.PI / 2; hub.position.z = face + side * 0.015; grp.add(hub);
   const spoke = (n, width, twist = 0, len = rimR * 0.82, off = 0) => {
+    const r0 = rimR * 0.18, sl = len - r0; // spokes start under the hub, so opposite spokes never share corners (keeps STL shells manifold)
     for (let k = 0; k < n; k++) {
       const a = (k / n) * Math.PI * 2 + off;
-      const m = new THREE.Mesh(new THREE.BoxGeometry(width, len, 0.03), mats.rim);
-      m.position.set((Math.cos(a) * len) / 2, (Math.sin(a) * len) / 2, face + side * 0.008);
+      const m = new THREE.Mesh(new THREE.BoxGeometry(width, sl, 0.03), mats.rim);
+      m.position.set(Math.cos(a) * (r0 + sl / 2), Math.sin(a) * (r0 + sl / 2), face + side * 0.008);
       m.rotation.z = a - Math.PI / 2; m.rotation.y = twist; grp.add(m);
     }
   };
@@ -1278,7 +1312,7 @@ function rebuild(fast = false) {
   car = buildCar(design, { reuseLivery: reuse });
   if (prev) { car.position.copy(prev.position); car.rotation.copy(prev.rotation); scene.remove(prev); disposeCar(prev, !!reuse); }
   scene.add(car);
-  if (mode === "drive") placeOnTrack(false);
+  if (mode === "drive") stats = performance(design, car.userData.body);
   updateReadouts(); refreshOverlay();
   clearTimeout(fullTimer);
   if (fast) fullTimer = setTimeout(() => rebuild(false), 260);
@@ -1304,19 +1338,36 @@ new ResizeObserver(resize).observe(stage);
 // ------------------------------------------------------------------ history
 const hist = { stack: [], i: -1 };
 function pushHistory() {
+  if (tweenTarget) { finishTween(); return; }
   const s = JSON.stringify(serialize(design));
   if (hist.stack[hist.i] === s) return;
   hist.stack = hist.stack.slice(0, hist.i + 1); hist.stack.push(s);
   if (hist.stack.length > 80) hist.stack.shift();
   hist.i = hist.stack.length - 1; updateUndo();
   store.set("coachbuilder.v2", JSON.parse(s));
+  $("#shareCode").value = shareCode(design);
 }
-function restore(s) { tweenId++; design = sanitize(JSON.parse(s)); selPart = null; selHandle = null; syncUI(); rebuild(false); updateUndo(); }
-function undo() { if (hist.i > 0) { hist.i--; restore(hist.stack[hist.i]); } }
-function redo() { if (hist.i < hist.stack.length - 1) { hist.i++; restore(hist.stack[hist.i]); } }
+function restore(s) { tweenId++; tweenTarget = null; drag = null; stroke = null; if (binDrag) { binDrag.ghost?.remove(); binDrag = null; } design = sanitize(JSON.parse(s)); selPart = null; selHandle = null; syncUI(); rebuild(false); updateUndo(); }
+function flushPending() { // commit a running animation or a debounced text edit before stepping through history
+  finishTween();
+  if (commitTimer) { clearTimeout(commitTimer); commitTimer = 0; pushHistory(); }
+}
+function cancelBinDrag() { // undo during a drag from the bin drops the part being dragged, nothing more
+  if (!binDrag) return false;
+  if (binDrag.part) { design.edits.parts = design.edits.parts.filter((p) => p !== binDrag.part); buildParts(car, design); }
+  binDrag.ghost?.remove(); binDrag = null;
+  return true;
+}
+function cancelLive() { // undo mid-stroke or mid-drag puts back the last saved state without stepping through history
+  if (!drag && !stroke) return false;
+  restore(hist.stack[hist.i]);
+  return true;
+}
+function undo() { if (cancelBinDrag() || cancelLive()) return; flushPending(); if (hist.i > 0) { hist.i--; restore(hist.stack[hist.i]); } }
+function redo() { if (cancelBinDrag() || cancelLive()) return; flushPending(); if (hist.i < hist.stack.length - 1) { hist.i++; restore(hist.stack[hist.i]); } }
 function updateUndo() { $("#undoBtn").disabled = hist.i <= 0; $("#redoBtn").disabled = hist.i >= hist.stack.length - 1; }
 let commitTimer = 0;
-const commitSoon = () => { clearTimeout(commitTimer); commitTimer = setTimeout(pushHistory, 450); };
+const commitSoon = () => { clearTimeout(commitTimer); commitTimer = setTimeout(() => { commitTimer = 0; pushHistory(); }, 450); };
 
 // ----------------------------------------------------------- build tools
 let tab = "shape", tool = "handles", selPart = null, selHandle = null;
@@ -1506,6 +1557,7 @@ function slidePart(id, mirrored) {
 let stroke = null;
 stage.addEventListener("pointerdown", (e) => {
   if (!toolActive() || !car || e.button > 0 || !overCanvas(e) || e.target !== renderer.domElement) return;
+  finishTween();
   aim(e);
   let took = false;
   if (tool === "handles") took = handleDown(e);
@@ -1552,7 +1604,17 @@ function sculptTick(dt) {
 
 // parts bin: drag a tile onto the car, or tap it to add the part in its usual spot
 let binDrag = null;
+let toastTimer = 0;
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), 3500); }
+function canAddPart() {
+  const ok = design.edits.parts.length < MAX_PARTS;
+  const msg = `This car has the maximum of ${MAX_PARTS} parts. Remove one to add another.`;
+  setStatus($("#partStatus"), ok ? "" : msg, ok ? "" : "err");
+  if (!ok) toast(msg);
+  return ok;
+}
 function binStart(e, type) {
+  if (e.button > 0) return; // right and middle clicks don't pick up parts
   e.preventDefault();
   binDrag = { type, x: e.clientX, y: e.clientY, moved: false, part: null, ghost: null };
 }
@@ -1563,13 +1625,13 @@ function binMove(e) {
   d.ghost.style.left = `${e.clientX}px`; d.ghost.style.top = `${e.clientY}px`;
   const h = overCanvas(e) ? (aim(e), hitBody()) : null;
   if (h && h.face.materialIndex === 0) {
-    if (!d.part) { d.part = newPart(d.type, h.uv.x, h.uv.y); design.edits.parts.push(d.part); buildParts(car, design); }
+    if (!d.part) { if (!canAddPart()) return; d.part = newPart(d.type, h.uv.x, h.uv.y); design.edits.parts.push(d.part); buildParts(car, design); }
     else { d.part.u = h.uv.x; d.part.v = h.uv.y; placeAllParts(car, design); }
   } else if (d.part) { design.edits.parts = design.edits.parts.filter((p) => p !== d.part); d.part = null; buildParts(car, design); }
 }
 function binUp() {
   const d = binDrag; binDrag = null; d.ghost?.remove();
-  if (!d.moved) { const part = newPart(d.type); design.edits.parts.push(part); selPart = part.id; buildParts(car, design); }
+  if (!d.moved) { if (!canAddPart()) return; const part = newPart(d.type); design.edits.parts.push(part); selPart = part.id; buildParts(car, design); }
   else if (d.part) selPart = d.part.id;
   else return;
   updateReadouts(); updateBuildUI(); refreshOverlay(); pushHistory();
@@ -1749,6 +1811,41 @@ document.querySelectorAll(".touch button").forEach((b) => {
   for (const ev of ["pointerup", "pointercancel", "pointerleave"]) b.addEventListener(ev, () => keys.delete(k));
 });
 
+// Phones: a slider moves only on a sideways drag across its row, so a scroll that starts on one never changes the car.
+const coarse = matchMedia("(pointer: coarse)");
+let slide = null;
+const touchesDown = new Set();
+const revertSlide = () => { if (slide?.on) { slide.inp.value = slide.v; slide.inp.dispatchEvent(new Event("input", { bubbles: true })); } slide = null; };
+document.addEventListener("pointerdown", (e) => {
+  if (e.pointerType === "touch") touchesDown.add(e.pointerId);
+  if (slide || touchesDown.size > 1) { revertSlide(); return; } // a second finger means a pinch: put the slider back and let the browser zoom
+  if (!coarse.matches || e.button > 0) return; // ranges ignore pointers here (CSS), so this handles touch, pen and mouse alike
+  const inp = e.target.closest?.(".track")?.querySelector('input[type="range"]');
+  if (!inp || inp.disabled) return;
+  slide = { inp, id: e.pointerId, x: e.clientX, y: e.clientY, v: parseFloat(inp.value), w: inp.getBoundingClientRect().width || 1, on: false };
+}, { passive: true });
+document.addEventListener("pointermove", (e) => {
+  if (!slide || e.pointerId !== slide.id) return;
+  const dx = e.clientX - slide.x, dy = e.clientY - slide.y;
+  if (!slide.on) {
+    if (Math.abs(dy) > 8 && Math.abs(dy) > Math.abs(dx)) { slide = null; return; }
+    if (Math.abs(dx) < 8) return;
+    slide.on = true;
+  }
+  const { inp } = slide, min = +inp.min, max = +inp.max, step = +inp.step || 0.01;
+  const v = clamp(min + Math.round((slide.v + (dx / slide.w) * (max - min) - min) / step) * step, min, max);
+  if (Math.abs(+inp.value - v) > step / 2) { inp.value = v; inp.dispatchEvent(new Event("input", { bubbles: true })); }
+}, { passive: true });
+const endSlide = (e) => {
+  touchesDown.delete(e.pointerId);
+  if (!slide || e.pointerId !== slide.id) return;
+  if (e.type === "pointercancel") { revertSlide(); return; } // the browser took the gesture (scroll or zoom)
+  const s = slide; slide = null;
+  if (s.on) s.inp.dispatchEvent(new Event("change", { bubbles: true }));
+};
+document.addEventListener("pointerup", endSlide);
+document.addEventListener("pointercancel", endSlide);
+
 // -------------------------------------------------------------- render loop
 let spin = false, last = nowMs();
 function frame(now) {
@@ -1785,7 +1882,7 @@ function buildSliders() {
         const seg = document.createElement("div"); seg.className = "seg"; seg.dataset.k = def.k; seg.setAttribute("role", "group"); seg.setAttribute("aria-label", def.label);
         for (const [id, name] of def.e) {
           const b = document.createElement("button"); b.type = "button"; b.textContent = name; b.dataset.v = id;
-          b.addEventListener("click", () => { design.params[def.k] = id; changed(false); pushHistory(); });
+          b.addEventListener("click", () => { finishTween(); design.params[def.k] = id; changed(false); pushHistory(); });
           seg.append(b);
         }
         row.append(lab, seg);
@@ -1793,7 +1890,7 @@ function buildSliders() {
         const inp = document.createElement("input"); inp.type = "range"; inp.id = `p-${def.k}`; inp.min = def.min; inp.max = def.max; inp.step = def.step;
         lab.htmlFor = inp.id;
         const out = document.createElement("output"); out.id = `o-${def.k}`;
-        inp.addEventListener("input", () => { design.params[def.k] = parseFloat(inp.value); changed(true); });
+        inp.addEventListener("input", () => { const v = parseFloat(inp.value); finishTween(); design.params[def.k] = v; changed(true); });
         inp.addEventListener("change", pushHistory);
         row.append(lab, out, inp);
       }
@@ -1841,8 +1938,16 @@ function updateReadouts() {
 }
 
 // tween numeric params toward a target design (presets, AI)
-let tweenId = 0;
+let tweenId = 0, tweenTarget = null;
+function finishTween() { // jump a running animation to its end, so undo and new edits never act on a half-way car
+  if (!tweenTarget) return;
+  tweenId++;
+  for (const def of PARAMS) if (!def.e) design.params[def.k] = tweenTarget[def.k];
+  tweenTarget = null;
+  changed(false); pushHistory();
+}
 function applyDesign(next, { animate = true, keepEdits = false } = {}) {
+  flushPending();
   next = sanitize(next);
   if (keepEdits) next.edits = design.edits;
   const from = { ...design.params };
@@ -1850,15 +1955,16 @@ function applyDesign(next, { animate = true, keepEdits = false } = {}) {
   design = { ...next, params: { ...design.params } };
   for (const def of PARAMS) if (def.e) design.params[def.k] = next.params[def.k];
   selPart = null; selHandle = null;
-  const done = () => { pushHistory(); };
-  if (!animate || matchMedia("(prefers-reduced-motion: reduce)").matches) { design.params = next.params; changed(false); done(); return; }
+  if (!animate || matchMedia("(prefers-reduced-motion: reduce)").matches) { design.params = next.params; changed(false); pushHistory(); return; }
+  tweenTarget = { ...next.params };
   const t0 = nowMs(), dur = 650;
   const step = (now) => {
     if (id !== tweenId) return;
     const t = smooth(0, 1, (now - t0) / dur);
+    if (t >= 1) { finishTween(); return; } // lands on the exact target values
     for (const def of PARAMS) if (!def.e) design.params[def.k] = lerp(from[def.k], next.params[def.k], t);
-    changed(t < 1);
-    if (t < 1) requestAnimationFrame(step); else done();
+    changed(true);
+    requestAnimationFrame(step);
   };
   requestAnimationFrame(step);
 }
@@ -1886,6 +1992,7 @@ function updateHint() {
 }
 const PE = [["peLift", "lift", (v) => `${Math.round(v * 1000)} mm`], ["peSize", "size", (v) => `${v.toFixed(2)}×`], ["peSx", "sx", (v) => `${v.toFixed(2)}×`], ["peSy", "sy", (v) => `${v.toFixed(2)}×`], ["peSz", "sz", (v) => `${v.toFixed(2)}×`], ["peYaw", "yaw", (v) => `${Math.round(v)}°`], ["peTilt", "tilt", (v) => `${Math.round(v)}°`], ["peRoll", "roll", (v) => `${Math.round(v)}°`]];
 function updateBuildUI() {
+  if (design.edits.parts.length < MAX_PARTS && $("#partStatus").textContent) setStatus($("#partStatus"), "");
   const del = $("#hDelete");
   del.disabled = !(selHandle && selHandle.k > 0 && selHandle.k < design.edits[selHandle.set].length - 1);
   const part = design.edits.parts.find((p) => p.id === selPart);
@@ -1902,9 +2009,11 @@ function deleteHandle() {
   const { set, k } = selHandle || {};
   const pts = design.edits[set];
   if (!pts || k <= 0 || k >= pts.length - 1) return;
+  if (drag?.kind === "handle") drag = null;
   pts.splice(k, 1); selHandle = null; rebuild(false); updateBuildUI(); pushHistory();
 }
 function removeSelectedPart() {
+  if (drag?.kind === "part") drag = null;
   design.edits.parts = design.edits.parts.filter((p) => p.id !== selPart); selPart = null;
   buildParts(car, design); updateReadouts(); updateBuildUI(); refreshOverlay(); pushHistory();
 }
@@ -1968,7 +2077,7 @@ function wireUI() {
   makeSeg("#peMat", PART_MATS, () => "", (v) => { editPart((p) => (p.mat = v), true); pushHistory(); });
   $("#peColor").addEventListener("input", (e) => editPart((p) => (p.color = e.target.value), true));
   $("#peColor").addEventListener("change", pushHistory);
-  $("#peDup").addEventListener("click", () => { const part = design.edits.parts.find((p) => p.id === selPart); if (!part) return; const c = { ...part, id: newPartId(), u: clamp(part.u + 0.04, 0, 1) }; design.edits.parts.push(c); selPart = c.id; buildParts(car, design); updateReadouts(); updateBuildUI(); refreshOverlay(); pushHistory(); });
+  $("#peDup").addEventListener("click", () => { const part = design.edits.parts.find((p) => p.id === selPart); if (!part || !canAddPart()) return; const c = { ...part, id: newPartId(), u: clamp(part.u + 0.04, 0, 1) }; design.edits.parts.push(c); selPart = c.id; buildParts(car, design); updateReadouts(); updateBuildUI(); refreshOverlay(); pushHistory(); });
   $("#peDel").addEventListener("click", removeSelectedPart);
   $("#clearEdits").addEventListener("click", (e) => {
     const b = e.currentTarget;
@@ -2014,6 +2123,7 @@ function showTab(t) {
   document.querySelectorAll("nav.tabs button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === t)));
   document.querySelectorAll("[data-pane]").forEach((s) => (s.hidden = s.dataset.pane !== t));
   if (t === "gallery") startGallery();
+  if (t === "save") $("#shareCode").value = shareCode(design);
   if (t !== "drive" && mode === "drive") exitDrive();
   if (t === "build" && spin) $("#spinBtn").click();
   refreshOverlay(); updateHint();
@@ -2095,12 +2205,15 @@ function thumbnail(d) {
     thumbCam = new THREE.PerspectiveCamera(30, 1.6, 0.1, 100);
   }
   const c = buildCar(d); thumbScene.add(c);
-  const dist = Math.max(8.5, d.params.length * 1.95);
-  thumbCam.position.set(dist * 0.62, 2.1, dist * 0.78); thumbCam.lookAt(0, 0.55, 0);
-  thumbR.render(thumbScene, thumbCam);
-  const url = thumbR.domElement.toDataURL("image/webp", 0.85);
-  thumbScene.remove(c); disposeCar(c);
+  let url;
+  try {
+    const dist = Math.max(8.5, d.params.length * 1.95);
+    thumbCam.position.set(dist * 0.62, 2.1, dist * 0.78); thumbCam.lookAt(0, 0.55, 0);
+    thumbR.render(thumbScene, thumbCam);
+    url = thumbR.domElement.toDataURL("image/webp", 0.85);
+  } finally { thumbScene.remove(c); disposeCar(c); }
   thumbCache.set(key, url);
+  if (thumbCache.size > 150) thumbCache.delete(thumbCache.keys().next().value);
   return url;
 }
 
@@ -2127,7 +2240,7 @@ const emptyBox = (t) => { const d = document.createElement("div"); d.className =
 function allCars() {
   const out = [];
   for (const [uid, doc] of galleryDocs) {
-    for (const c of Array.isArray(doc?.cars) ? doc.cars : []) {
+    for (const c of Array.isArray(doc?.cars) ? doc.cars.slice(-40) : []) {
       if (!c || typeof c.id !== "string") continue;
       out.push({ uid, id: c.id, key: `${uid}/${c.id}`, at: typeof c.at === "number" ? c.at : 0, design: sanitize(c.design) });
     }
@@ -2139,6 +2252,22 @@ function likeCounts() {
   for (const doc of likeDocs.values()) for (const k of Array.isArray(doc?.ids) ? doc.ids : []) if (typeof k === "string") m.set(k, (m.get(k) || 0) + 1);
   return m;
 }
+const thumbQueue = [];
+let thumbBusy = false, galleryLimit = 48;
+const thumbIO = new IntersectionObserver((entries) => {
+  for (const en of entries) if (en.isIntersecting) { thumbIO.unobserve(en.target); thumbQueue.push(en.target); }
+  pumpThumbs();
+}, { rootMargin: "200px" });
+function pumpThumbs() { // one thumbnail per tick keeps the page responsive with a big gallery
+  if (thumbBusy || !thumbQueue.length) return;
+  const img = thumbQueue.shift();
+  thumbBusy = true;
+  setTimeout(() => {
+    try { if (img.isConnected && img._design) img.src = thumbnail(img._design); }
+    catch { img.alt = "Preview unavailable"; }
+    finally { thumbBusy = false; pumpThumbs(); }
+  }, 16);
+}
 let renderSeq = 0;
 async function renderGallery() {
   const seq = ++renderSeq;
@@ -2148,6 +2277,9 @@ async function renderGallery() {
   const mine = new Set(Array.isArray(likeDocs.get(myId)?.ids) ? likeDocs.get(myId).ids : []);
   if (sortBy === "mine") cars = cars.filter((c) => c.uid === myId);
   cars.sort((a, b) => (sortBy === "top" ? (counts.get(b.key) || 0) - (counts.get(a.key) || 0) || b.at - a.at : b.at - a.at));
+  const total = cars.length;
+  cars = cars.slice(0, galleryLimit);
+  thumbIO.disconnect(); thumbQueue.length = 0; // cards from the previous render are gone
   if (!cars.length) { host.replaceChildren(emptyBox(sortBy === "mine" ? "You have not published a design yet. Name it above and press Publish to gallery." : "No designs yet. Be the first: name your car above and press Publish to gallery.")); return; }
   let names = {};
   if (user) { try { names = await user.profiles([...new Set(cars.map((c) => c.uid))]); } catch {} }
@@ -2166,9 +2298,16 @@ async function renderGallery() {
     acts.append(load, like);
     if (c.uid === myId || isOwner) { const del = document.createElement("button"); del.textContent = "Remove"; del.addEventListener("click", () => removeCar(c, del)); acts.append(del); }
     card.append(img, meta, acts);
-    requestAnimationFrame(() => { img.src = thumbnail(c.design); });
+    const cached = thumbCache.get(JSON.stringify(serialize(c.design)));
+    if (cached) img.src = cached; else { img._design = c.design; thumbIO.observe(img); }
     return card;
   }));
+  if (total > cars.length) {
+    const more = document.createElement("button"); more.className = "btn ghost"; more.type = "button";
+    more.textContent = `Show more (${total - cars.length} hidden)`;
+    more.addEventListener("click", () => { galleryLimit += 48; renderGallery(); });
+    host.append(more);
+  }
 }
 let writing = Promise.resolve();
 const serial = (fn) => (writing = writing.then(fn, fn));
@@ -2218,6 +2357,16 @@ function removeCar(c, btn) {
 }
 
 // --------------------------------------------------------------------- AI
+// Take only well-formed fields from Claude's answer; anything else keeps the car's current value.
+function mergeValid(cur, incoming, ok) {
+  const out = { ...cur };
+  if (incoming && typeof incoming === "object") for (const k of Object.keys(cur)) if (Object.hasOwn(incoming, k) && ok(k, incoming[k])) out[k] = incoming[k];
+  return out;
+}
+const isNum = (v) => typeof v === "number" && isFinite(v);
+const paramOk = (k, v) => { const def = PARAMS.find((d) => d.k === k); return !!def && (def.e ? def.e.some(([id]) => id === v) : isNum(v)); };
+const PAINT_OK = { color: hexOk, stripeColor: hexOk, rim: hexOk, finish: (v) => FINISHES.some(([id]) => id === v), stripes: (v) => STRIPES.some(([id]) => id === v), number: (v) => typeof v === "string", tint: isNum };
+const paintOk = (k, v) => !!PAINT_OK[k]?.(v);
 async function setupAI() {
   if (!IN_CLAUDE) return;
   let sample = null;
@@ -2248,7 +2397,9 @@ Reply with only a JSON object: {"name": "<short evocative model name>", "params"
     try {
       const out = await sample.json(prompt, { signal: ctl.signal, onText: () => setStatus(st, "Shaping the body…") });
       if (!out || typeof out !== "object") throw { code: "invalid_json" };
-      applyDesign({ name: out.name, params: { ...design.params, ...out.params }, paint: { ...design.paint, ...out.paint } }, { keepEdits: true });
+      finishTween();
+      const name = typeof out.name === "string" && out.name.trim() ? out.name : design.name;
+      applyDesign({ name, params: mergeValid(design.params, out.params, paramOk), paint: mergeValid(design.paint, out.paint, paintOk) }, { keepEdits: true });
       setStatus(st, typeof out.note === "string" ? out.note.slice(0, 220) : "Done. Refine it with the sliders or in Build.", "ok");
       $("#aiGo").disabled = false;
     } catch (e) {
@@ -2264,6 +2415,7 @@ Reply with only a JSON object: {"name": "<short evocative model name>", "params"
 // ------------------------------------------------------------------- boot
 if (!IN_CLAUDE) { $("#envNote").textContent = "standalone"; $("#expNote").textContent = "Exports download straight to your device. AI design and the shared gallery need the Claude artifact version."; }
 wireUI();
+document.querySelectorAll('.row > input[type="range"]').forEach((inp) => { const t = document.createElement("div"); t.className = "track"; inp.replaceWith(t); t.append(inp); }); // sliders get a touch strip (see slide handling)
 setTool("handles");
 syncUI();
 resize();
@@ -2278,7 +2430,7 @@ window.__coachbuilder = {
   stepDrive: (dt) => stepDrive(dt), enterDrive, exitDrive, get carObj() { return car; }, stlBytes, glbBytes, showTab, setTool, undo, redo, get hist() { return hist; },
   sculptAt(u, v, secs = 1, mode = "pull") { brush.mode = mode; for (let i = 0; i < secs * 30; i++) stampSculpt(u, v, 1 / 30); applySculpt(car.userData.body, design.edits.sculpt); placeAllParts(car, design); pushHistory(); },
   paintAt(u, v, mat = 1, size = 0.1) { brush.mat = mat; brush.psize = size; stampPaint(u, v); redrawLivery(); pushHistory(); },
-  addPart(type, u, v) { const p = newPart(type, u, v); design.edits.parts.push(p); buildParts(car, design); pushHistory(); return p.id; },
+  addPart(type, u, v) { if (!canAddPart()) return null; const p = newPart(type, u, v); design.edits.parts.push(p); buildParts(car, design); pushHistory(); return p.id; },
   moveHandle(set, k, d) { design.edits[set][k][1] = d; rebuild(false); pushHistory(); },
 };
 </script>
